@@ -1,0 +1,1 @@
+-- Brand rename: runtime code and API metadata are now Savoris. Existing migration files stay immutable for Flyway.

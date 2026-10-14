@@ -1,4 +1,4 @@
--- Initial Savoris schema (PostgreSQL), generated from the JPA entities.
+-- Initial DineChain schema (PostgreSQL), generated from the JPA entities.
 -- Schema changes from now on go into new files V2__..., V3__... - never edit this one after it has run.
 
     create table areas (
