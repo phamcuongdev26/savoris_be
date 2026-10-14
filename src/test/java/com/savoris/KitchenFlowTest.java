@@ -35,7 +35,7 @@ class KitchenFlowTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        waiter = createStaff(StaffRole.CASHIER, branch);
+        waiter = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         pho = createMenuItem("Pho bo", 55000);
         rice = createMenuItem("Com rang", 45000);

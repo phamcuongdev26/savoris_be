@@ -32,7 +32,7 @@ class PeakHourTest extends IntegrationTestSupport {
     @Test
     void fullKitchen_pausesTakeawayAndDelivery_butKeepsServingSeatedGuests() throws Exception {
         BranchEntity branch = createBranch(5);
-        StaffEntity cashier = createStaff(StaffRole.CASHIER, branch);
+        StaffEntity cashier = createStaff(StaffRole.WAITER, branch);
         StaffEntity chef = createStaff(StaffRole.CHEF, branch);
         MenuItemEntity pho = createMenuItem("Pho bo", 55000);
         MenuItemEntity rice = createMenuItem("Com rang", 45000);
@@ -95,7 +95,7 @@ class PeakHourTest extends IntegrationTestSupport {
         for (int i = 0; i < branchCount; i++) {
             BranchEntity branch = createBranch(null);
             branches.add(branch);
-            cashiers.add(createStaff(StaffRole.CASHIER, branch));
+            cashiers.add(createStaff(StaffRole.WAITER, branch));
         }
 
         List<Callable<String>> requests = new ArrayList<>();

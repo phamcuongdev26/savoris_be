@@ -47,7 +47,7 @@ public class OrderController {
     @PutMapping("/{orderId}/complete")
     @Operation(summary = "Hoàn thành đơn hàng", description = "Chỉ hoàn thành được khi mọi món đã phục vụ hoặc đã huỷ")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.CASHIER)
+    @PreAuthorize(Roles.PAYMENT)
     public ResponseEntity<OrderResponse> completeOrder(@CurrentUser Integer staffId, @PathVariable Integer orderId) {
         return ResponseEntity.ok(orderService.completeOrder(staffId, orderId));
     }
@@ -55,7 +55,7 @@ public class OrderController {
     @PutMapping("/{orderId}/cancel")
     @Operation(summary = "Hủy đơn hàng", description = "Các món chưa phục vụ cũng bị gỡ khỏi hàng đợi bếp")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.CASHIER)
+    @PreAuthorize(Roles.PAYMENT)
     public ResponseEntity<OrderResponse> cancelOrder(@CurrentUser Integer staffId, @PathVariable Integer orderId) {
         return ResponseEntity.ok(orderService.cancelOrder(staffId, orderId));
     }
@@ -71,7 +71,7 @@ public class OrderController {
     @GetMapping("/branch/{branchId}/refunds-due")
     @Operation(summary = "Đơn chuyển khoản đã huỷ cần hoàn tiền", description = "Khách đã báo chuyển khoản hoặc tiền về sau khi đơn bị huỷ")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.CASHIER)
+    @PreAuthorize(Roles.PAYMENT)
     public ResponseEntity<List<OrderResponse>> getRefundsDue(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
         return ResponseEntity.ok(orderService.getRefundsDue(staffId, branchId));
     }
@@ -79,7 +79,7 @@ public class OrderController {
     @PutMapping("/{orderId}/refund-settled")
     @Operation(summary = "Đã hoàn tiền cho đơn chuyển khoản bị huỷ")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.CASHIER)
+    @PreAuthorize(Roles.PAYMENT)
     public ResponseEntity<OrderResponse> settleRefund(@CurrentUser Integer staffId, @PathVariable Integer orderId) {
         return ResponseEntity.ok(orderService.settleRefund(staffId, orderId));
     }

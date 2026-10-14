@@ -55,7 +55,7 @@ class PricingLoyaltyTest extends IntegrationTestSupport {
     void setUp() {
         branch = createBranch(null);
         owner = createStaff(StaffRole.ADMIN, null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
@@ -134,7 +134,7 @@ class PricingLoyaltyTest extends IntegrationTestSupport {
         for (int i = 0; i < 8; i++) {
             BranchEntity b = i == 0 ? branch : createBranch(null);
             branches.add(b);
-            cashiers.add(i == 0 ? cashier : createStaff(StaffRole.CASHIER, b));
+            cashiers.add(i == 0 ? cashier : createStaff(StaffRole.WAITER, b));
         }
 
         ExecutorService pool = Executors.newFixedThreadPool(cashiers.size());

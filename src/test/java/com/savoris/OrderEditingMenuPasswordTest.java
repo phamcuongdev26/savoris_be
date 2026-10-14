@@ -46,7 +46,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     void setUp() {
         branch = createBranch(null);
         waiter = createStaff(StaffRole.WAITER, branch);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
@@ -91,7 +91,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     @Test
     void addingToATakeawayOrderRespectsTheFullKitchen() throws Exception {
         BranchEntity small = createBranch(2);
-        StaffEntity smallCashier = createStaff(StaffRole.CASHIER, small);
+        StaffEntity smallCashier = createStaff(StaffRole.WAITER, small);
         String takeaway = mockMvc.perform(post("/orders").with(as(smallCashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(small, "TAKEAWAY", null, dish(pho, 2))))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();

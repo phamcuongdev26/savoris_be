@@ -29,7 +29,7 @@ class OrderFlowTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         pho = createMenuItem("Pho bo", 55000);
         tea = createMenuItem("Tra da", 5000);
     }

@@ -52,7 +52,7 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
     void setUp() {
         branch = createBranch(null);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         cashier.setHourlyRate(BigDecimal.valueOf(30000));
         staffRepository.save(cashier);
         waiter = createStaff(StaffRole.WAITER, branch);

@@ -10,13 +10,13 @@ public final class Roles {
     public static final String ADMIN = "hasRole('ADMIN')";
     // Owner and branch managers: staff, refunds, branch settings
     public static final String MANAGEMENT = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
-    // Creating cashier-side orders
-    public static final String ORDER_WRITE = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER')";
+    // Creating front-of-house orders
+    public static final String ORDER_WRITE = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAITER')";
     public static final String FRONT_OF_HOUSE = ORDER_WRITE;
     // Handling money and closing orders
-    public static final String CASHIER = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER')";
-    // Everyone in the restaurant permission matrix: admin, manager, cashier, chef
-    public static final String RESTAURANT = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER','CHEF')";
+    public static final String PAYMENT = FRONT_OF_HOUSE;
+    // Everyone in the restaurant permission matrix: admin, manager, front of house, chef
+    public static final String RESTAURANT = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAITER','CHEF')";
     public static final String SERVICE = RESTAURANT;
     // Cooks and owner may move dishes through the kitchen flow
     public static final String KITCHEN = "hasAnyRole('ADMIN','CHEF')";

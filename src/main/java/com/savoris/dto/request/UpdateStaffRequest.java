@@ -26,6 +26,9 @@ public class UpdateStaffRequest {
     @NotNull(message = "Role is required")
     private StaffRole role;
 
+    @NotNull(message = "Branch ID is required")
+    private Integer branchId;
+
     @NotNull(message = "Hourly rate is required")
     @DecimalMin("0")
     private Double hourlyRate;

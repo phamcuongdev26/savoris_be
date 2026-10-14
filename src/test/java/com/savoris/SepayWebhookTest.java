@@ -41,7 +41,7 @@ class SepayWebhookTest extends IntegrationTestSupport {
     void setUp() throws Exception {
         branch = createBranch(null);
         chef = createStaff(StaffRole.CHEF, branch);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         admin = createStaff(StaffRole.ADMIN, null);
         pho = createMenuItem("Pho bo", 50000);
         setBankAccount("MBBank", ACCOUNT);

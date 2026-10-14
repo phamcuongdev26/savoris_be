@@ -50,7 +50,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
@@ -200,7 +200,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
         mockMvc.perform(put("/reservations/" + id + "/cancel").with(as(cashier)))
             .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        StaffEntity outsider = createStaff(StaffRole.CASHIER, createBranch(null));
+        StaffEntity outsider = createStaff(StaffRole.WAITER, createBranch(null));
         mockMvc.perform(get("/reservations/" + id).with(as(outsider))).andExpect(status().isForbidden());
     }
 

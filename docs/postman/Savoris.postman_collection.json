@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "536b14dd-1b1e-568f-8487-43444a66fd09",
     "name": "Savoris API",
-    "description": "Đủ 129 API của Savoris, mỗi API một request.\n\nCách dùng: chạy **1. Đăng nhập → Nhân viên đăng nhập** trước (token tự lưu), rồi gọi API bất kỳ.\nMặc định đăng nhập bằng admin (chủ chuỗi, gọi được mọi API). Đổi username trong body để thử vai trò khác: quanly, thungan, phucvu, daubep, kho — mật khẩu chung 12345.\n\nDatabase mới chỉ có 4 chi nhánh: tạo khu vực → bàn (lưu tableId, qrToken), danh mục, món trước khi gọi món. Thư mục \"Khách quét QR gọi món\" không cần token: qrToken lấy từ request Thêm bàn.\n\nRequest \"Tạo ...\" tự lưu id vừa tạo vào biến (orderId, customerId...). Các request Xoá/Ngừng chỉ tác động lên đối tượng vừa tạo trong collection này. Sửa id mặc định ở tab Variables của collection.",
+    "description": "Đủ 129 API của Savoris, mỗi API một request.\n\nCách dùng: chạy **1. Đăng nhập → Nhân viên đăng nhập** trước (token tự lưu), rồi gọi API bất kỳ.\nMặc định đăng nhập bằng admin (chủ chuỗi, gọi được mọi API). Đổi username trong body để thử vai trò khác: quanly, phucvu, daubep, kho — mật khẩu chung 12345.\n\nDatabase mới chỉ có 4 chi nhánh: tạo khu vực → bàn (lưu tableId, qrToken), danh mục, món trước khi gọi món. Thư mục \"Khách quét QR gọi món\" không cần token: qrToken lấy từ request Thêm bàn.\n\nRequest \"Tạo ...\" tự lưu id vừa tạo vào biến (orderId, customerId...). Các request Xoá/Ngừng chỉ tác động lên đối tượng vừa tạo trong collection này. Sửa id mặc định ở tab Variables của collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -883,7 +883,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/customers/by-phone?phone={{newCustomerPhone}}",
-            "description": "`GET /customers/by-phone`\n\nThu ngân hỏi SĐT để tích / dùng điểm"
+            "description": "`GET /customers/by-phone`\n\nPhục vụ hỏi SĐT để tích / dùng điểm"
           }
         },
         {
@@ -1342,7 +1342,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/orders/branch/{{branchId}}/refunds-due",
-            "description": "`GET /orders/branch/{branchId}/refunds-due`\n\nKhách đã báo chuyển khoản rồi đơn bị huỷ, hoặc SePay báo tiền về sau khi đơn đã huỷ. Quyền: thu ngân"
+            "description": "`GET /orders/branch/{branchId}/refunds-due`\n\nKhách đã báo chuyển khoản rồi đơn bị huỷ, hoặc SePay báo tiền về sau khi đơn đã huỷ. Quyền: phục vụ"
           }
         },
         {
@@ -1352,7 +1352,7 @@
             "method": "PUT",
             "header": [],
             "url": "{{baseUrl}}/orders/{{cancelOrderId}}/refund-settled",
-            "description": "`PUT /orders/{cancelOrderId}/refund-settled`\n\nThu ngân đã chuyển trả (hoặc kiểm tra là tiền chưa về). Đơn biến khỏi danh sách cần hoàn tiền"
+            "description": "`PUT /orders/{cancelOrderId}/refund-settled`\n\nPhục vụ đã chuyển trả (hoặc kiểm tra là tiền chưa về). Đơn biến khỏi danh sách cần hoàn tiền"
           }
         }
       ]
@@ -1482,7 +1482,7 @@
               }
             ],
             "url": "{{baseUrl}}/public/takeaway-orders",
-            "description": "`POST /public/takeaway-orders`\n\npayMethod CASH (trả tại quầy) hoặc BANK_TRANSFER (chuyển khoản theo mã QR). Đơn chờ thanh toán, thu ngân thu tiền / xác nhận chuyển khoản xong bếp mới nấu",
+            "description": "`POST /public/takeaway-orders`\n\npayMethod CASH (trả tại quầy) hoặc BANK_TRANSFER (chuyển khoản theo mã QR). Đơn chờ thanh toán, phục vụ thu tiền / xác nhận chuyển khoản xong bếp mới nấu",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"branchId\": {{branchId}},\n  \"guestName\": \"Chị Lan\",\n  \"guestPhone\": \"0912345678\",\n  \"payMethod\": \"BANK_TRANSFER\",\n  \"notes\": \"Ít cay\",\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 2\n    }\n  ]\n}",
@@ -1530,7 +1530,7 @@
             "method": "POST",
             "header": [],
             "url": "{{baseUrl}}/public/takeaway-orders/{{takeawayToken}}/transferred",
-            "description": "`POST /public/takeaway-orders/{takeawayToken}/transferred`\n\nChỉ cho đơn chuyển khoản đang chờ thanh toán. Đơn đã báo thì không tự huỷ sau 30 phút; thu ngân thấy nhắc kiểm tra tiền về",
+            "description": "`POST /public/takeaway-orders/{takeawayToken}/transferred`\n\nChỉ cho đơn chuyển khoản đang chờ thanh toán. Đơn đã báo thì không tự huỷ sau 30 phút; phục vụ thấy nhắc kiểm tra tiền về",
             "auth": {
               "type": "noauth"
             }
@@ -1869,7 +1869,7 @@
             "description": "`POST /staff`",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"code\": \"NV{{$randomInt}}{{$randomInt}}\",\n  \"fullName\": \"Thu ngân mới\",\n  \"username\": \"nv{{$timestamp}}\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111111\",\n  \"role\": \"CASHIER\",\n  \"branchId\": {{branchId}},\n  \"hourlyRate\": 30000,\n  \"password\": \"Welcome@123\"\n}",
+              "raw": "{\n  \"code\": \"NV{{$randomInt}}{{$randomInt}}\",\n  \"fullName\": \"Phục vụ mới\",\n  \"username\": \"nv{{$timestamp}}\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111111\",\n  \"role\": \"WAITER\",\n  \"branchId\": {{branchId}},\n  \"hourlyRate\": 30000,\n  \"password\": \"Welcome@123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1923,7 +1923,7 @@
             "description": "`PUT /staff/{staffId}`",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Thu ngân mới (sửa)\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111112\",\n  \"role\": \"CASHIER\",\n  \"hourlyRate\": 32000\n}",
+              "raw": "{\n  \"fullName\": \"Phục vụ mới (sửa)\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111112\",\n  \"role\": \"WAITER\",\n  \"hourlyRate\": 32000\n}",
               "options": {
                 "raw": {
                   "language": "json"

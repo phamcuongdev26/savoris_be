@@ -38,7 +38,7 @@ class WebTakeawayTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() throws Exception {
         branch = createBranch(null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         admin = createStaff(StaffRole.ADMIN, null);
         pho = createMenuItem("Pho bo", 50000);

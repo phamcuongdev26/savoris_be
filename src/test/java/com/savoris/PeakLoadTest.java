@@ -311,7 +311,7 @@ class PeakLoadTest {
             tableIds.add(diningTableRepository.save(table).getId());
         }
         return new Branch(branch, tableIds,
-            token(staff(StaffRole.CASHIER, branch, "cashier" + i)),
+            token(staff(StaffRole.WAITER, branch, "cashier" + i)),
             token(staff(StaffRole.CHEF, branch, "chef" + i)));
     }
 

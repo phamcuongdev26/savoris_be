@@ -31,7 +31,7 @@ class ReadyMadeAndStockTest extends IntegrationTestSupport {
     void setUp() throws Exception {
         branch = createBranch(null);
         admin = createStaff(StaffRole.ADMIN, null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         waiter = createStaff(StaffRole.WAITER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);

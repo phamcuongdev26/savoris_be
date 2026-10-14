@@ -26,7 +26,7 @@ public class PaymentController {
     @PostMapping
     @Operation(summary = "Thanh toán tiền mặt", description = "Nhập tiền khách đưa (cashReceived), server tính tiền thối. Chỉ nhận CASH")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.CASHIER)
+    @PreAuthorize(Roles.PAYMENT)
     public ResponseEntity<PaymentResponse> processPayment(@CurrentUser Integer staffId, @Valid @RequestBody CreatePaymentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(paymentService.processPayment(staffId, request));
     }

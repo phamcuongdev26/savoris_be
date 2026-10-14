@@ -70,7 +70,7 @@ public class CustomerController {
 
     @GetMapping("/by-phone")
     @PreAuthorize(Roles.FRONT_OF_HOUSE)
-    @Operation(summary = "Tìm khách theo số điện thoại", description = "Thu ngân hỏi SĐT để tích / dùng điểm")
+    @Operation(summary = "Tìm khách theo số điện thoại", description = "Phục vụ hỏi SĐT để tích / dùng điểm")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<CustomerResponse> findByPhone(@RequestParam String phone) {
         return ResponseEntity.ok(customerService.findByPhone(phone));

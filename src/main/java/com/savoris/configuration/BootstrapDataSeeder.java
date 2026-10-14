@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * screen) and one login per role so the first people can sign in. No menu, tables, stock, customers or
  * promotions are created: that is real data the chain enters itself.
  *
- * Accounts (all with savoris.bootstrap.password): admin (whole chain); quanly, thungan, phucvu, daubep, kho (CN01).
+ * Accounts (all with savoris.bootstrap.password): admin (whole chain); quanly, phucvu, daubep, kho (CN01).
  */
 @Slf4j
 @Component
@@ -60,11 +60,10 @@ public class BootstrapDataSeeder implements ApplicationRunner {
             String hash = passwordEncoder.encode(password);
             account("admin", "Quản trị chuỗi", StaffRole.ADMIN, null, hash);
             account("quanly", "Quản lý CN01", StaffRole.BRANCH_MANAGER, firstBranch, hash);
-            account("thungan", "Thu ngân CN01", StaffRole.CASHIER, firstBranch, hash);
             account("phucvu", "Phục vụ CN01", StaffRole.WAITER, firstBranch, hash);
             account("daubep", "Đầu bếp CN01", StaffRole.CHEF, firstBranch, hash);
             account("kho", "Kho CN01", StaffRole.WAREHOUSE, firstBranch, hash);
-            log.info("Created role accounts admin, quanly, thungan, phucvu, daubep, kho");
+            log.info("Created role accounts admin, quanly, phucvu, daubep, kho");
         }
     }
 

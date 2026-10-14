@@ -28,7 +28,7 @@ class GuestQrOrderTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        waiter = createStaff(StaffRole.CASHIER, branch);
+        waiter = createStaff(StaffRole.WAITER, branch);
         pho = createMenuItem("Pho bo", 50000);
         table = diningTableRepository.findById(table(branch, 3)).orElseThrow();
     }

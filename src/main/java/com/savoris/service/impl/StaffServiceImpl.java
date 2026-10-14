@@ -30,7 +30,7 @@ import java.util.Set;
 public class StaffServiceImpl implements StaffService {
 
     private static final Set<StaffRole> BRANCH_MANAGED_ROLES =
-        EnumSet.of(StaffRole.CASHIER, StaffRole.WAITER, StaffRole.CHEF, StaffRole.WAREHOUSE);
+        EnumSet.of(StaffRole.WAITER, StaffRole.CHEF, StaffRole.WAREHOUSE);
 
     private final StaffRepository staffRepository;
     private final PasswordEncoder passwordEncoder;
@@ -87,14 +87,15 @@ public class StaffServiceImpl implements StaffService {
     public StaffDetailResponse updateStaff(Integer actorId, Integer staffId, UpdateStaffRequest request) {
         StaffEntity staff = findStaff(staffId);
         StaffEntity actor = findStaff(actorId);
-        // Both the current and the new role must be within what the actor may manage (no self-promotion)
+        // Both the current and the new role/branch must be within what the actor may manage (no self-promotion).
         checkCanManage(actor, staff.getBranchId(), staff.getRole());
-        checkCanManage(actor, staff.getBranchId(), request.getRole());
+        checkCanManage(actor, request.getBranchId(), request.getRole());
 
         staff.setFullName(request.getFullName());
         staff.setEmail(request.getEmail());
         staff.setPhone(request.getPhone());
         staff.setRole(request.getRole());
+        staff.setBranchId(request.getBranchId());
         if (request.getHourlyRate() != null) {
             staff.setHourlyRate(java.math.BigDecimal.valueOf(request.getHourlyRate()));
         }

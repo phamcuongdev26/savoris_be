@@ -34,7 +34,7 @@ class CashPaymentTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() throws Exception {
         branch = createBranch(null);
-        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier = createStaff(StaffRole.WAITER, branch);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         pho = createMenuItem("Pho bo", 55000);
         // 2 x 55.000 = 110.000
@@ -77,8 +77,8 @@ class CashPaymentTest extends IntegrationTestSupport {
 
     @Test
     void anOrderIsPaidOnlyOnce_evenWhenTwoCashiersPressPayAtTheSameTime() throws Exception {
-        List<StaffEntity> cashiers = List.of(cashier, createStaff(StaffRole.CASHIER, branch),
-            createStaff(StaffRole.CASHIER, branch), createStaff(StaffRole.CASHIER, branch));
+        List<StaffEntity> cashiers = List.of(cashier, createStaff(StaffRole.WAITER, branch),
+            createStaff(StaffRole.WAITER, branch), createStaff(StaffRole.WAITER, branch));
         ExecutorService pool = Executors.newFixedThreadPool(cashiers.size());
         try {
             List<Callable<Integer>> attempts = cashiers.stream()
@@ -119,7 +119,7 @@ class CashPaymentTest extends IntegrationTestSupport {
 
     @Test
     void cannotPayForAnotherBranchOrACancelledOrder() throws Exception {
-        StaffEntity outsider = createStaff(StaffRole.CASHIER, createBranch(null));
+        StaffEntity outsider = createStaff(StaffRole.WAITER, createBranch(null));
         pay(outsider, orderId, 110000).andExpect(status().isForbidden());
 
         mockMvc.perform(put("/orders/" + orderId + "/cancel").with(as(cashier))).andExpect(status().isOk());

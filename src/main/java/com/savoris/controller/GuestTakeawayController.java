@@ -58,7 +58,7 @@ public class GuestTakeawayController {
 
     @PostMapping("/takeaway-orders")
     @Operation(summary = "Đặt món mang về", description = "payMethod CASH (trả tại quầy) hoặc BANK_TRANSFER (chuyển khoản theo mã QR). "
-        + "Đơn chờ thanh toán, thu ngân thu tiền / xác nhận chuyển khoản xong bếp mới nấu")
+        + "Đơn chờ thanh toán, phục vụ thu tiền / xác nhận chuyển khoản xong bếp mới nấu")
     public ResponseEntity<WebTakeawayResponse> placeOrder(@Valid @RequestBody WebTakeawayRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(guestTakeawayService.placeOrder(request));
     }
@@ -73,7 +73,7 @@ public class GuestTakeawayController {
     }
 
     @PostMapping("/takeaway-orders/{token}/transferred")
-    @Operation(summary = "Khách báo đã chuyển khoản", description = "Đơn không bị tự huỷ vì quá hạn nữa; thu ngân kiểm tra tiền về rồi xác nhận")
+    @Operation(summary = "Khách báo đã chuyển khoản", description = "Đơn không bị tự huỷ vì quá hạn nữa; phục vụ kiểm tra tiền về rồi xác nhận")
     public ResponseEntity<WebTakeawayResponse> claimTransfer(@PathVariable String token) {
         return ResponseEntity.ok(guestTakeawayService.claimTransfer(token));
     }
