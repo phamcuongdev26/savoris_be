@@ -57,7 +57,7 @@ savoris:
   # (admin, quanly, phucvu, daubep, kho) with this password. Change the password after the first login.
   bootstrap:
     enabled: ${BOOTSTRAP_ENABLED:true}
-    password: ${BOOTSTRAP_PASSWORD:12345}
+    password: ${BOOTSTRAP_PASSWORD:savoris123}
   # VAT used until the owner sets one via PUT /settings/vat (8% = reduced rate for restaurants until end of 2026)
   vat-percent: 8
   loyalty:

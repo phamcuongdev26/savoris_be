@@ -31,6 +31,14 @@ public class KitchenController {
         return ResponseEntity.ok(kitchenService.getQueue(staffId, branchId));
     }
 
+    @GetMapping("/branches/{branchId}/void-queue")
+    @Operation(summary = "Danh sách yêu cầu hủy món chờ bếp xử lý")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
+    public ResponseEntity<List<KitchenTicketResponse>> getVoidQueue(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(kitchenService.getVoidQueue(staffId, branchId));
+    }
+
     @GetMapping("/branches/{branchId}/load")
     @Operation(summary = "Tải bếp", description = "Số phần đang chờ/nấu, % công suất, thời gian chờ ước tính")
     @SecurityRequirement(name = "bearerAuth")

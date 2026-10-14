@@ -46,4 +46,15 @@ public class ImageController {
         log.info("Menu photo uploaded to Cloudinary ({} bytes)", data.length);
         return ResponseEntity.ok(new UploadedImage(url));
     }
+
+    @PostMapping(path = "/site", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Tải ảnh trang web lên", description = "Form-data field \"file\": PNG, JPEG hoặc WebP, tối đa 5MB. Trả về link ảnh trên Cloudinary")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<UploadedImage> uploadSiteImage(@RequestParam("file") MultipartFile file) throws IOException {
+        byte[] data = file.getBytes();
+        String url = cloudinary.upload(data, ImageFiles.check(data, MAX_BYTES), "savoris/site");
+        log.info("Site photo uploaded to Cloudinary ({} bytes)", data.length);
+        return ResponseEntity.ok(new UploadedImage(url));
+    }
 }

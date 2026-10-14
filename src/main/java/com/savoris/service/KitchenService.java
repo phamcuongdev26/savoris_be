@@ -9,6 +9,7 @@ import java.util.Map;
 
 public interface KitchenService {
     List<KitchenTicketResponse> getQueue(Integer staffId, Integer branchId);
+    List<KitchenTicketResponse> getVoidQueue(Integer staffId, Integer branchId);
     KitchenTicketResponse startCooking(Integer staffId, Integer itemId);
     KitchenTicketResponse markReady(Integer staffId, Integer itemId);
     KitchenTicketResponse markServed(Integer staffId, Integer itemId);

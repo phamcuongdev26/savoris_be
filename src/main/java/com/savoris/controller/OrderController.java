@@ -3,6 +3,7 @@ package com.savoris.controller;
 import com.savoris.dto.request.AddOrderItemsRequest;
 import com.savoris.dto.request.CancelOrderItemRequest;
 import com.savoris.dto.request.CreateOrderRequest;
+import com.savoris.dto.request.VoidResolveRequest;
 import com.savoris.dto.response.OrderResponse;
 import com.savoris.security.CurrentUser;
 import com.savoris.service.OrderService;
@@ -110,5 +111,27 @@ public class OrderController {
                                                     @PathVariable Integer itemId,
                                                     @Valid @RequestBody(required = false) CancelOrderItemRequest request) {
         return ResponseEntity.ok(orderService.cancelItem(staffId, orderId, itemId, request != null ? request.getReason() : null));
+    }
+
+    @PutMapping("/{orderId}/items/{itemId}/void-request")
+    @PreAuthorize(Roles.ORDER_WRITE)
+    @Operation(summary = "Yêu cầu huỷ món đang nấu",
+        description = "Gửi yêu cầu hủy cho bếp xem xét khi món đang nấu hoặc đã xong. Bếp sẽ quyết định chấp nhận, làm lại, hoặc tính phí.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<OrderResponse> requestVoid(@CurrentUser Integer staffId, @PathVariable Integer orderId,
+                                                     @PathVariable Integer itemId,
+                                                     @Valid @RequestBody(required = false) CancelOrderItemRequest request) {
+        return ResponseEntity.ok(orderService.requestVoid(staffId, orderId, itemId, request != null ? request.getReason() : null));
+    }
+
+    @PutMapping("/{orderId}/items/{itemId}/void-resolve")
+    @PreAuthorize(Roles.KITCHEN)
+    @Operation(summary = "Bếp xử lý yêu cầu hủy",
+        description = "ACCEPT: hủy + trả kho. REMAKE: làm lại miễn phí. CHARGE: giữ nguyên hóa đơn, bưng ra.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<OrderResponse> resolveVoid(@CurrentUser Integer staffId, @PathVariable Integer orderId,
+                                                     @PathVariable Integer itemId,
+                                                     @Valid @RequestBody VoidResolveRequest request) {
+        return ResponseEntity.ok(orderService.resolveVoid(staffId, orderId, itemId, request.getResolution()));
     }
 }

@@ -2,6 +2,7 @@ package com.savoris.service.impl;
 
 import com.savoris.constant.BranchStatus;
 import com.savoris.constant.OrderItemStatus;
+import com.savoris.constant.VoidResolution;
 import com.savoris.constant.OrderStatus;
 import com.savoris.constant.OrderType;
 import com.savoris.constant.PaymentMethod;
@@ -66,7 +67,7 @@ public class OrderServiceImpl implements OrderService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private static final List<OrderItemStatus> UNFINISHED_ITEM_STATUSES =
-        List.of(OrderItemStatus.PENDING, OrderItemStatus.COOKING, OrderItemStatus.READY);
+        List.of(OrderItemStatus.PENDING, OrderItemStatus.COOKING, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.READY);
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -350,6 +351,110 @@ public class OrderServiceImpl implements OrderService {
         recalculate(order);
 
         log.info("Cancelled {} on order {} ({})", item.getItemName(), order.getCode(), reason);
+        return toResponse(order, orderItemRepository.findByOrderId(orderId));
+    }
+
+    // Waiter flags a cooking/ready item for chef review; chef cannot interrupt active cooking from the waiter screen
+    @Override
+    @Transactional
+    public OrderResponse requestVoid(Integer staffId, Integer orderId, Integer itemId, String reason) {
+        OrderEntity order = findOpenOrder(staffId, orderId);
+        OrderItemEntity item = orderItemRepository.findById(itemId)
+            .filter(i -> i.getOrderId().equals(orderId))
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Dish " + itemId + " is not on order " + order.getCode()));
+
+        OrderItemStatus from = item.getStatus();
+        if (from == OrderItemStatus.PENDING) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Món chưa vào bếp — dùng nút huỷ trực tiếp");
+        }
+        if (from == OrderItemStatus.SERVED || from == OrderItemStatus.CANCELLED) {
+            throw new AppException(ErrorCode.INVALID_STATE, item.getItemName() + " đã " + from + ", không thể yêu cầu hủy");
+        }
+        if (from == OrderItemStatus.VOID_REQUESTED) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Yêu cầu hủy đã được gửi, đang chờ bếp xử lý");
+        }
+
+        if (orderItemRepository.transition(itemId, from, OrderItemStatus.VOID_REQUESTED, LocalDateTime.now()) == 0) {
+            throw new AppException(ErrorCode.INVALID_STATE, item.getItemName() + " đã thay đổi, thử lại");
+        }
+        OrderItemEntity updated = orderItemRepository.findById(itemId).orElseThrow();
+        updated.setVoidReason(reason);
+        updated.setVoidRequestedBy(staffId);
+        orderItemRepository.save(updated);
+
+        log.info("Void requested for item {} on order {} by staff {}: {}", itemId, order.getCode(), staffId, reason);
+        return toResponse(order, orderItemRepository.findByOrderId(orderId));
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse resolveVoid(Integer staffId, Integer orderId, Integer itemId, VoidResolution resolution) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
+        branchAccessGuard.check(staffId, order.getBranchId());
+
+        StaffRole role = staffRepository.findById(staffId)
+            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED)).getRole();
+        if (role != StaffRole.ADMIN && role != StaffRole.BRANCH_MANAGER && role != StaffRole.CHEF) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Chỉ đầu bếp hoặc quản lý mới có thể xử lý yêu cầu hủy");
+        }
+
+        OrderItemEntity item = orderItemRepository.findById(itemId)
+            .filter(i -> i.getOrderId().equals(orderId))
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Item not on this order"));
+        if (item.getStatus() != OrderItemStatus.VOID_REQUESTED) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Item " + itemId + " không ở trạng thái VOID_REQUESTED");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        switch (resolution) {
+            case ACCEPT -> {
+                if (orderItemRepository.transition(itemId, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.CANCELLED, now) == 0) {
+                    throw new AppException(ErrorCode.INVALID_STATE, "Concurrent update");
+                }
+                inventoryService.restockForDish(order.getBranchId(), item, staffId);
+                OrderItemEntity accepted = orderItemRepository.findById(itemId).orElseThrow();
+                accepted.setVoidResolution(VoidResolution.ACCEPT);
+                accepted.setCancelReason("Bếp chấp nhận hủy" + (item.getVoidReason() != null ? ": " + item.getVoidReason() : ""));
+                orderItemRepository.save(accepted);
+                recalculate(order);
+            }
+            case REMAKE -> {
+                if (orderItemRepository.transition(itemId, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.CANCELLED, now) == 0) {
+                    throw new AppException(ErrorCode.INVALID_STATE, "Concurrent update");
+                }
+                inventoryService.restockForDish(order.getBranchId(), item, staffId);
+                OrderItemEntity cancelled = orderItemRepository.findById(itemId).orElseThrow();
+                cancelled.setVoidResolution(VoidResolution.REMAKE);
+                cancelled.setCancelReason("Làm lại miễn phí");
+                orderItemRepository.save(cancelled);
+                // New PENDING item at the same price — kitchen will deduct stock again when it starts cooking
+                OrderItemEntity remake = new OrderItemEntity();
+                remake.setOrderId(orderId);
+                remake.setMenuItemId(item.getMenuItemId());
+                remake.setItemName(item.getItemName());
+                remake.setUnitPrice(item.getUnitPrice());
+                remake.setQuantity(item.getQuantity());
+                remake.setAmount(item.getAmount());
+                remake.setNote("[Làm lại] " + (item.getVoidReason() != null ? item.getVoidReason() : ""));
+                remake.setNeedsKitchen(true);
+                remake.setStatus(OrderItemStatus.PENDING);
+                orderItemRepository.save(remake);
+                recalculate(order); // net zero: cancelled item out, remake item in at same price
+            }
+            case CHARGE -> {
+                // Item was already cooked; customer still pays — move it back to READY for the waiter to serve
+                if (orderItemRepository.transition(itemId, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.READY, now) == 0) {
+                    throw new AppException(ErrorCode.INVALID_STATE, "Concurrent update");
+                }
+                OrderItemEntity charged = orderItemRepository.findById(itemId).orElseThrow();
+                charged.setVoidResolution(VoidResolution.CHARGE);
+                charged.setReadyAt(now);
+                orderItemRepository.save(charged);
+            }
+        }
+
+        log.info("Void resolved ({}) for item {} on order {} by staff {}", resolution, itemId, order.getCode(), staffId);
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
 

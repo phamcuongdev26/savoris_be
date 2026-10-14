@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 public class KitchenServiceImpl implements KitchenService {
 
     private static final List<OrderItemStatus> QUEUE_STATUSES =
-        List.of(OrderItemStatus.PENDING, OrderItemStatus.COOKING, OrderItemStatus.READY);
+        List.of(OrderItemStatus.PENDING, OrderItemStatus.COOKING, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.READY);
     private static final List<OrderItemStatus> ACTIVE_STATUSES =
         List.of(OrderItemStatus.PENDING, OrderItemStatus.COOKING);
     private static final int THROUGHPUT_WINDOW_MINUTES = 30;
@@ -67,6 +67,22 @@ public class KitchenServiceImpl implements KitchenService {
             .stream()
             .collect(Collectors.toMap(OrderEntity::getId, Function.identity()));
 
+        LocalDateTime now = LocalDateTime.now();
+        return items.stream()
+            .map(item -> KitchenTicketResponse.from(item, orders.get(item.getOrderId()), now))
+            .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KitchenTicketResponse> getVoidQueue(Integer staffId, Integer branchId) {
+        branchAccessGuard.check(staffId, branchId);
+        List<OrderItemEntity> items = orderItemRepository.findKitchenQueue(
+            branchId, List.of(OrderItemStatus.VOID_REQUESTED));
+        Map<Integer, OrderEntity> orders = orderRepository
+            .findAllById(items.stream().map(OrderItemEntity::getOrderId).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(OrderEntity::getId, Function.identity()));
         LocalDateTime now = LocalDateTime.now();
         return items.stream()
             .map(item -> KitchenTicketResponse.from(item, orders.get(item.getOrderId()), now))

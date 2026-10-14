@@ -1,6 +1,7 @@
 package com.savoris.entity;
 
 import com.savoris.constant.OrderItemStatus;
+import com.savoris.constant.VoidResolution;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -58,6 +59,16 @@ public class OrderItemEntity {
 
     @Column(name = "cancel_reason", length = 255)
     private String cancelReason;
+
+    @Column(name = "void_reason", length = 255)
+    private String voidReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "void_resolution", length = 20)
+    private VoidResolution voidResolution;
+
+    @Column(name = "void_requested_by")
+    private Integer voidRequestedBy;
 
     // Copied from the dish when ordered: false = handed out by the floor staff, never on the kitchen screen
     @Builder.Default

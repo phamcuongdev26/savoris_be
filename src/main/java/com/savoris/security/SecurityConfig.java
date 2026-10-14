@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -70,6 +71,13 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/swagger-ui.html"
                 ).permitAll()
+
+                // Site CMS read endpoints are public (PUT endpoints require ADMIN via @PreAuthorize)
+                .requestMatchers(HttpMethod.GET, "/site/**").permitAll()
+
+                // Guest booking: slot availability + reservation creation require no login
+                .requestMatchers(HttpMethod.GET,  "/reservations/guest/slots").permitAll()
+                .requestMatchers(HttpMethod.POST, "/reservations/guest").permitAll()
 
                 // All other endpoints require JWT
                 .anyRequest().authenticated()

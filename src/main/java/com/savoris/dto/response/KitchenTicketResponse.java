@@ -2,6 +2,7 @@ package com.savoris.dto.response;
 
 import com.savoris.constant.OrderItemStatus;
 import com.savoris.constant.OrderType;
+import com.savoris.constant.VoidResolution;
 import com.savoris.entity.OrderEntity;
 import com.savoris.entity.OrderItemEntity;
 import lombok.AllArgsConstructor;
@@ -30,9 +31,11 @@ public class KitchenTicketResponse {
     private Integer cookedBy;
     private LocalDateTime orderedAt;
     private long waitingMinutes;
+    private String voidReason;
+    private VoidResolution voidResolution;
 
     public static KitchenTicketResponse from(OrderItemEntity item, OrderEntity order, LocalDateTime now) {
-        return new KitchenTicketResponse(
+        KitchenTicketResponse r = new KitchenTicketResponse(
             item.getId(),
             order.getId(),
             order.getCode(),
@@ -45,7 +48,10 @@ public class KitchenTicketResponse {
             item.getStatus(),
             item.getCookedBy(),
             item.getOrderedAt(),
-            Duration.between(item.getOrderedAt(), now).toMinutes()
+            Duration.between(item.getOrderedAt(), now).toMinutes(),
+            item.getVoidReason(),
+            item.getVoidResolution()
         );
+        return r;
     }
 }
