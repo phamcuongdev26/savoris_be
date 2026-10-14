@@ -3,6 +3,7 @@ package com.dinechain;
 import com.dinechain.constant.StaffRole;
 import com.dinechain.constant.StaffStatus;
 import com.dinechain.entity.BranchEntity;
+import com.dinechain.entity.MenuItemEntity;
 import com.dinechain.entity.StaffEntity;
 import com.dinechain.security.jwt.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,9 @@ class SecurityRulesTest extends IntegrationTestSupport {
     private StaffEntity owner;
     private StaffEntity manager;
     private StaffEntity waiter;
+    private StaffEntity cashier;
+    private StaffEntity chef;
+    private StaffEntity warehouse;
 
     @BeforeEach
     void setUp() {
@@ -34,6 +38,9 @@ class SecurityRulesTest extends IntegrationTestSupport {
         owner = createStaff(StaffRole.ADMIN, null);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         waiter = createStaff(StaffRole.WAITER, branch);
+        cashier = createStaff(StaffRole.CASHIER, branch);
+        chef = createStaff(StaffRole.CHEF, branch);
+        warehouse = createStaff(StaffRole.WAREHOUSE, branch);
     }
 
     private String staffJson(String role, BranchEntity at) {
@@ -70,6 +77,33 @@ class SecurityRulesTest extends IntegrationTestSupport {
         mockMvc.perform(post("/staff").with(as(owner)).contentType(MediaType.APPLICATION_JSON)
                 .content(staffJson("BRANCH_MANAGER", branch)))
             .andExpect(status().isCreated());
+    }
+
+    @Test
+    void restaurantRouterMatchesThePermissionMatrix() throws Exception {
+        MenuItemEntity dish = createMenuItem("Pho " + unique(), 50000);
+
+        mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(chef)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(warehouse)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/orders").with(as(chef)).contentType(MediaType.APPLICATION_JSON)
+                .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
+                .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(cashier)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/kitchen/items/1/start").with(as(manager)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(put("/kitchen/items/1/start").with(as(cashier)))
+            .andExpect(status().isForbidden());
     }
 
     @Test

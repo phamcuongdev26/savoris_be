@@ -10,18 +10,19 @@ public final class Roles {
     public static final String ADMIN = "hasRole('ADMIN')";
     // Owner and branch managers: staff, refunds, branch settings
     public static final String MANAGEMENT = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
-    // Taking orders and looking after guests
-    public static final String FRONT_OF_HOUSE = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER','WAITER')";
+    // Creating cashier-side orders
+    public static final String ORDER_WRITE = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER')";
+    public static final String FRONT_OF_HOUSE = ORDER_WRITE;
     // Handling money and closing orders
     public static final String CASHIER = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER')";
-    // Cooking
-    public static final String KITCHEN = "hasAnyRole('ADMIN','BRANCH_MANAGER','CHEF')";
-    // Everyone working the floor or the kitchen (not the warehouse)
-    public static final String SERVICE = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER','WAITER','CHEF')";
-    // Changing stock
-    public static final String STOCK = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAREHOUSE')";
-    // Looking at stock (chefs need to know what is running out)
-    public static final String STOCK_READ = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAREHOUSE','CHEF')";
+    // Everyone in the restaurant permission matrix: admin, manager, cashier, chef
+    public static final String RESTAURANT = "hasAnyRole('ADMIN','BRANCH_MANAGER','CASHIER','CHEF')";
+    public static final String SERVICE = RESTAURANT;
+    // Cooks and owner may move dishes through the kitchen flow
+    public static final String KITCHEN = "hasAnyRole('ADMIN','CHEF')";
+    // Stock count/import belongs to admin and branch manager in the restaurant router
+    public static final String STOCK = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
+    public static final String STOCK_READ = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
 
     private Roles() {
     }

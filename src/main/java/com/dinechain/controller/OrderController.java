@@ -30,7 +30,7 @@ public class OrderController {
     @PostMapping
     @Operation(summary = "Tạo đơn hàng", description = "Khi bếp quá tải, đơn mang đi/giao hàng bị từ chối với mã 503 BRANCH_BUSY; đơn tại bàn luôn được nhận")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.FRONT_OF_HOUSE)
+    @PreAuthorize(Roles.ORDER_WRITE)
     public ResponseEntity<OrderResponse> createOrder(@CurrentUser Integer staffId,
                                                      @Valid @RequestBody CreateOrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(staffId, request));
@@ -39,6 +39,7 @@ public class OrderController {
     @GetMapping("/{orderId}")
     @Operation(summary = "Lấy đơn hàng")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<OrderResponse> getOrder(@CurrentUser Integer staffId, @PathVariable Integer orderId) {
         return ResponseEntity.ok(orderService.getOrder(staffId, orderId));
     }
@@ -62,6 +63,7 @@ public class OrderController {
     @GetMapping("/branch/{branchId}")
     @Operation(summary = "Danh sách đơn hàng đang mở theo chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<List<OrderResponse>> getOrdersByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
         return ResponseEntity.ok(orderService.getOrdersByBranch(staffId, branchId));
     }
@@ -85,13 +87,13 @@ public class OrderController {
     @GetMapping("/customer/{customerId}")
     @Operation(summary = "Danh sách đơn hàng theo khách hàng")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.FRONT_OF_HOUSE)
+    @PreAuthorize(Roles.ORDER_WRITE)
     public ResponseEntity<List<OrderResponse>> getOrdersByCustomer(@CurrentUser Integer staffId, @PathVariable Integer customerId) {
         return ResponseEntity.ok(orderService.getOrdersByCustomer(staffId, customerId));
     }
 
     @PostMapping("/{orderId}/items")
-    @PreAuthorize(Roles.FRONT_OF_HOUSE)
+    @PreAuthorize(Roles.ORDER_WRITE)
     @Operation(summary = "Gọi thêm món", description = "Thêm món vào đơn đang mở (chưa thanh toán); tổng tiền, khuyến mãi, VAT được tính lại")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<OrderResponse> addItems(@CurrentUser Integer staffId, @PathVariable Integer orderId,
@@ -100,7 +102,7 @@ public class OrderController {
     }
 
     @PutMapping("/{orderId}/items/{itemId}/cancel")
-    @PreAuthorize(Roles.FRONT_OF_HOUSE)
+    @PreAuthorize(Roles.ORDER_WRITE)
     @Operation(summary = "Huỷ một món",
         description = "Món chưa nấu: nhân viên huỷ được. Món đang nấu / đã xong: chỉ quản lý. Món đã bưng ra: không huỷ được")
     @SecurityRequirement(name = "bearerAuth")

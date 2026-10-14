@@ -35,7 +35,7 @@ class KitchenFlowTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        waiter = createStaff(StaffRole.WAITER, branch);
+        waiter = createStaff(StaffRole.CASHIER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
         pho = createMenuItem("Pho bo", 55000);
         rice = createMenuItem("Com rang", 45000);
@@ -75,14 +75,14 @@ class KitchenFlowTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.cookedBy").value(chef.getId()));
 
         // Cannot skip steps or go back
-        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(waiter)))
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef)))
             .andExpect(status().isConflict());
         mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef)))
             .andExpect(status().isConflict());
 
         mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef)))
             .andExpect(jsonPath("$.status").value("READY"));
-        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(waiter)))
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef)))
             .andExpect(jsonPath("$.status").value("SERVED"));
 
         mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(chef)))

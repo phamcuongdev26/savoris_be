@@ -45,15 +45,17 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
     private BranchEntity branch;
     private StaffEntity manager;
     private StaffEntity waiter;
+    private StaffEntity cashier;
     private StaffEntity warehouse;
 
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
         manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        cashier = createStaff(StaffRole.CASHIER, branch);
+        cashier.setHourlyRate(BigDecimal.valueOf(30000));
+        staffRepository.save(cashier);
         waiter = createStaff(StaffRole.WAITER, branch);
-        waiter.setHourlyRate(BigDecimal.valueOf(30000));
-        staffRepository.save(waiter);
         warehouse = createStaff(StaffRole.WAREHOUSE, branch);
     }
 
@@ -78,14 +80,14 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         LocalDate tomorrow = LocalDate.now().plusDays(1);
 
         mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(assignJson(waiter, tomorrow)))
+                .content(assignJson(cashier, tomorrow)))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.staffName").value(waiter.getFullName()))
+            .andExpect(jsonPath("$.staffName").value(cashier.getFullName()))
             .andExpect(jsonPath("$.startTime").value("07:00:00"));
 
         // Same person, same shift, same day
         mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(assignJson(waiter, tomorrow)))
+                .content(assignJson(cashier, tomorrow)))
             .andExpect(status().isConflict());
         // Staff of another branch
         StaffEntity outsider = createStaff(StaffRole.WAITER, createBranch(null));
@@ -94,18 +96,18 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
             .andExpect(status().isBadRequest());
         // A day in the past
         mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(assignJson(waiter, LocalDate.now().minusDays(1))))
+                .content(assignJson(cashier, LocalDate.now().minusDays(1))))
             .andExpect(status().isBadRequest());
         // Waiters do not make the schedule
         mockMvc.perform(post("/branches/" + branch.getId() + "/shifts").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"X\",\"startTime\":\"07:00\",\"endTime\":\"15:00\"}"))
             .andExpect(status().isForbidden());
 
-        mockMvc.perform(get("/branches/" + branch.getId() + "/schedule").with(as(waiter))
+        mockMvc.perform(get("/branches/" + branch.getId() + "/schedule").with(as(cashier))
                 .param("from", tomorrow.toString()).param("to", tomorrow.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(1)));
-        mockMvc.perform(get("/shifts/me").with(as(waiter))
+        mockMvc.perform(get("/shifts/me").with(as(cashier))
                 .param("from", LocalDate.now().toString()).param("to", tomorrow.plusDays(6).toString()))
             .andExpect(jsonPath("$", hasSize(1)));
     }
@@ -117,22 +119,22 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         LocalDateTime start = now.minusMinutes(10);
         int shiftId = createShift(start.toLocalTime(), start.toLocalTime().plusHours(4));
         String assigned = mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON).content(assignJson(waiter, start.toLocalDate())))
+                .contentType(MediaType.APPLICATION_JSON).content(assignJson(cashier, start.toLocalDate())))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         int assignmentId = JsonPath.read(assigned, "$.id");
 
         mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(manager)))
             .andExpect(status().isForbidden());
-        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-out").with(as(waiter)))
+        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-out").with(as(cashier)))
             .andExpect(status().isConflict());
-        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(waiter)))
+        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(cashier)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.checkInAt").exists());
-        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(waiter)))
+        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(cashier)))
             .andExpect(status().isConflict());
         mockMvc.perform(delete("/shift-assignments/" + assignmentId).with(as(manager)))
             .andExpect(status().isConflict());
-        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-out").with(as(waiter)))
+        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-out").with(as(cashier)))
             .andExpect(status().isOk());
 
         // Pretend the shift lasted exactly 3.5 hours to check the pay maths
@@ -144,13 +146,13 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         mockMvc.perform(get("/branches/" + branch.getId() + "/timesheet").with(as(manager))
                 .param("from", start.toLocalDate().toString()).param("to", start.toLocalDate().toString()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].staffId").value(waiter.getId()))
+            .andExpect(jsonPath("$[0].staffId").value(cashier.getId()))
             .andExpect(jsonPath("$[0].shiftsWorked").value(1))
             .andExpect(jsonPath("$[0].minutesWorked").value(210))
             .andExpect(jsonPath("$[0].hoursWorked").value(3.5))
             .andExpect(jsonPath("$[0].wage").value(105000));
 
-        mockMvc.perform(get("/branches/" + branch.getId() + "/timesheet").with(as(waiter))
+        mockMvc.perform(get("/branches/" + branch.getId() + "/timesheet").with(as(cashier))
                 .param("from", start.toLocalDate().toString()).param("to", start.toLocalDate().toString()))
             .andExpect(status().isForbidden());
     }
@@ -160,10 +162,10 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         LocalDateTime later = LocalDateTime.now().plusHours(3);
         int shiftId = createShift(later.toLocalTime(), later.toLocalTime().plusHours(2));
         String assigned = mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON).content(assignJson(waiter, later.toLocalDate())))
+                .contentType(MediaType.APPLICATION_JSON).content(assignJson(cashier, later.toLocalDate())))
             .andReturn().getResponse().getContentAsString();
         int assignmentId = JsonPath.read(assigned, "$.id");
-        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(waiter)))
+        mockMvc.perform(put("/shift-assignments/" + assignmentId + "/check-in").with(as(cashier)))
             .andExpect(status().isConflict());
     }
 
@@ -176,7 +178,7 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         IngredientEntity rice = ingredient("Rice");
         stock(beef, "2");  // rice is not stocked here yet: receiving creates its row
 
-        String draft = mockMvc.perform(post("/purchase-orders").with(as(warehouse)).contentType(MediaType.APPLICATION_JSON)
+        String draft = mockMvc.perform(post("/purchase-orders").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":["
                     + "{\"ingredientId\":" + beef.getId() + ",\"quantity\":10,\"unitPrice\":250000},"
                     + "{\"ingredientId\":" + rice.getId() + ",\"quantity\":50,\"unitPrice\":18000}]}"))
@@ -188,14 +190,14 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         int poId = JsonPath.read(draft, "$.id");
         int beefLine = JsonPath.read(draft, "$.items[0].id");
 
-        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(warehouse))).andExpect(status().isConflict());
+        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(manager))).andExpect(status().isConflict());
         mockMvc.perform(put("/purchase-orders/" + poId + "/order").with(as(warehouse))).andExpect(status().isForbidden());
         mockMvc.perform(put("/purchase-orders/" + poId + "/order").with(as(manager)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ORDERED"));
 
         // Only 8 kg of beef arrived; rice in full
-        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(warehouse)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"items\":[{\"itemId\":" + beefLine + ",\"receivedQuantity\":8}]}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("RECEIVED"))
@@ -208,7 +210,7 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
             .allMatch(m -> m.getType() == StockMovementType.IMPORT)).isTrue();
 
         // Received goods cannot be received again or cancelled
-        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(warehouse))).andExpect(status().isConflict());
+        mockMvc.perform(put("/purchase-orders/" + poId + "/receive").with(as(manager))).andExpect(status().isConflict());
         mockMvc.perform(put("/purchase-orders/" + poId + "/cancel").with(as(manager))).andExpect(status().isConflict());
         assertThat(stockOf(beef)).isEqualByComparingTo("10");
     }
@@ -226,11 +228,11 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         mockMvc.perform(post("/purchase-orders").with(as(otherWarehouse)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":[" + line + "]}"))
             .andExpect(status().isForbidden());
-        mockMvc.perform(post("/purchase-orders").with(as(warehouse)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/purchase-orders").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":[" + line + "," + line + "]}"))
             .andExpect(status().isBadRequest());
 
-        String draft = mockMvc.perform(post("/purchase-orders").with(as(warehouse)).contentType(MediaType.APPLICATION_JSON)
+        String draft = mockMvc.perform(post("/purchase-orders").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":[" + line + "]}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         int poId = JsonPath.read(draft, "$.id");
@@ -238,10 +240,10 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        mockMvc.perform(get("/purchase-orders/branch/" + branch.getId()).with(as(warehouse)))
+        mockMvc.perform(get("/purchase-orders/branch/" + branch.getId()).with(as(manager)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(1)));
-        mockMvc.perform(get("/ingredients").with(as(warehouse))).andExpect(status().isOk());
+        mockMvc.perform(get("/ingredients").with(as(manager))).andExpect(status().isOk());
     }
 
     private SupplierEntity supplier() {

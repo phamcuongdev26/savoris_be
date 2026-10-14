@@ -54,7 +54,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     }
 
     private String createOrder(String json) throws Exception {
-        return mockMvc.perform(post("/orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON).content(json))
+        return mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON).content(json))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     }
 
@@ -69,7 +69,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         String created = createOrder(orderJson(branch, "DINE_IN", table(branch, 1), dish(pho, 1)));
         int orderId = JsonPath.read(created, "$.id");
 
-        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(addJson(tea, 3)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items", hasSize(2)))
@@ -82,7 +82,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
 
         // Paid bill: no more additions
         pay(cashier, orderId, 65000).andExpect(status().isCreated());
-        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(addJson(tea, 1)))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("ALREADY_PAID"));
@@ -110,8 +110,8 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         int phoItem = JsonPath.read(created, "$.items[0].id");
         int teaItem = JsonPath.read(created, "$.items[1].id");
 
-        // Tea not started: the waiter drops it, the bill shrinks and the kitchen no longer sees it
-        mockMvc.perform(put("/orders/" + orderId + "/items/" + teaItem + "/cancel").with(as(waiter))
+        // Tea not started: the cashier drops it, the bill shrinks and the kitchen no longer sees it
+        mockMvc.perform(put("/orders/" + orderId + "/items/" + teaItem + "/cancel").with(as(cashier))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"khach doi y\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[1].status").value("CANCELLED"))
@@ -120,9 +120,9 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(chef)))
             .andExpect(jsonPath("$", hasSize(1)));
 
-        // Pho already on the stove: the waiter cannot, the manager can
+        // Pho already on the stove: the cashier cannot, the manager can
         mockMvc.perform(put("/kitchen/items/" + phoItem + "/start").with(as(chef))).andExpect(status().isOk());
-        mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(waiter)))
+        mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(cashier)))
             .andExpect(status().isForbidden());
         mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(manager)))
             .andExpect(status().isOk())
@@ -169,9 +169,9 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
 
         // Customer changes their mind: one bowl instead of two -> 50.000, promo no longer applies, at most 50 points fit
         int phoItem = JsonPath.read(created, "$.items[0].id");
-        mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(waiter)))
+        mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(cashier)))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(addJson(pho, 1)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.subtotal").value(50000))
@@ -193,7 +193,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
                 .content("{\"available\":false}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.available").value(false));
-        mockMvc.perform(post("/orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "TAKEAWAY", null, dish(pho, 1))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("MENU_ITEM_UNAVAILABLE"));
@@ -208,7 +208,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.price").value(70000))
             .andExpect(jsonPath("$.basePrice").value(50000));
-        mockMvc.perform(post("/orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "TAKEAWAY", null, dish(pho, 1))))
             .andExpect(jsonPath("$.totalAmount").value(70000));
 

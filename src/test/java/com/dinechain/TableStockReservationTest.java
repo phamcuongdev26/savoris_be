@@ -44,6 +44,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
     private BranchEntity branch;
     private StaffEntity cashier;
     private StaffEntity chef;
+    private StaffEntity manager;
     private MenuItemEntity pho;
 
     @BeforeEach
@@ -51,6 +52,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
         branch = createBranch(null);
         cashier = createStaff(StaffRole.CASHIER, branch);
         chef = createStaff(StaffRole.CHEF, branch);
+        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
     }
 
@@ -145,9 +147,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
         IngredientEntity rice = ingredient("Rice", "5");
         stock(beef, "1.5");
         stock(rice, "40");
-        StaffEntity warehouse = createStaff(StaffRole.WAREHOUSE, branch);
-
-        mockMvc.perform(get("/inventory/branch/" + branch.getId() + "/low-stock").with(as(warehouse)))
+        mockMvc.perform(get("/inventory/branch/" + branch.getId() + "/low-stock").with(as(manager)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(1)))
             .andExpect(jsonPath("$[0].ingredientId").value(beef.getId()));
@@ -162,9 +162,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
     void stockCorrectionIsKeptInTheHistory() throws Exception {
         IngredientEntity beef = ingredient("Beef", "2");
         stock(beef, "10");
-        StaffEntity warehouse = createStaff(StaffRole.WAREHOUSE, branch);
-
-        mockMvc.perform(put("/inventory/branch/" + branch.getId() + "/ingredient/" + beef.getId()).with(as(warehouse))
+        mockMvc.perform(put("/inventory/branch/" + branch.getId() + "/ingredient/" + beef.getId()).with(as(manager))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":8,\"notes\":\"stock count\"}"))
             .andExpect(status().isOk());
 

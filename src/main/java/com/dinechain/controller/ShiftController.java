@@ -41,6 +41,7 @@ public class ShiftController {
     @GetMapping("/branches/{branchId}/shifts")
     @Operation(summary = "Danh sách ca của chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<List<ShiftResponse>> getShifts(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
         return ResponseEntity.ok(shiftService.getShifts(staffId, branchId));
     }
@@ -66,6 +67,7 @@ public class ShiftController {
     @GetMapping("/branches/{branchId}/schedule")
     @Operation(summary = "Lịch làm việc của chi nhánh", description = "Tối đa 62 ngày, ví dụ ?from=2026-10-12&to=2026-10-18")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<List<StaffShiftResponse>> getSchedule(
         @CurrentUser Integer staffId, @PathVariable Integer branchId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -76,6 +78,7 @@ public class ShiftController {
     @GetMapping("/shifts/me")
     @Operation(summary = "Lịch làm việc của tôi")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<List<StaffShiftResponse>> getMySchedule(
         @CurrentUser Integer staffId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -86,6 +89,7 @@ public class ShiftController {
     @PutMapping("/shift-assignments/{assignmentId}/check-in")
     @Operation(summary = "Chấm công vào", description = "Chỉ ca của chính mình, từ 30 phút trước giờ vào ca đến hết ca")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<StaffShiftResponse> checkIn(@CurrentUser Integer staffId, @PathVariable Integer assignmentId) {
         return ResponseEntity.ok(shiftService.checkIn(staffId, assignmentId));
     }
@@ -93,6 +97,7 @@ public class ShiftController {
     @PutMapping("/shift-assignments/{assignmentId}/check-out")
     @Operation(summary = "Chấm công ra")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<StaffShiftResponse> checkOut(@CurrentUser Integer staffId, @PathVariable Integer assignmentId) {
         return ResponseEntity.ok(shiftService.checkOut(staffId, assignmentId));
     }

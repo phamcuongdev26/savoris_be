@@ -68,6 +68,10 @@ dinechain:
   takeaway:
     # Web takeaway not paid within this many minutes is cancelled (unless the guest said they transferred)
     payment-timeout-minutes: ${TAKEAWAY_PAYMENT_TIMEOUT_MINUTES:30}
+  cloudinary:
+    # cloudinary://API_KEY:API_SECRET@CLOUD_NAME (Cloudinary dashboard > API Keys). Empty = no photo upload;
+    # the bank QR is then kept in the database
+    url: ${CLOUDINARY_URL:}
   sepay:
     # API key set on the SePay webhook (Authorization: Apikey <key>). Empty = webhook off, the cashier confirms transfers
     api-key: ${SEPAY_API_KEY:}

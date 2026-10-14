@@ -43,6 +43,8 @@ public enum ErrorCode {
 
     // Peak hours
     BRANCH_BUSY("BRANCH_BUSY", "Kitchen is at full capacity, takeaway and delivery orders are paused", 503),
+    IMAGE_STORAGE_NOT_CONFIGURED("IMAGE_STORAGE_NOT_CONFIGURED", "Image upload is not set up: set CLOUDINARY_URL on the server", 503),
+    IMAGE_UPLOAD_FAILED("IMAGE_UPLOAD_FAILED", "Could not store the image, try again", 502),
 
     // Server errors
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "Internal server error", 500);

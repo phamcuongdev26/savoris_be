@@ -133,7 +133,7 @@ class OrderFlowTest extends IntegrationTestSupport {
 
         mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef))).andExpect(status().isOk());
         mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef))).andExpect(status().isOk());
-        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(cashier))).andExpect(status().isOk());
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef))).andExpect(status().isOk());
 
         // Every dish served, but nobody paid yet
         mockMvc.perform(put("/orders/" + orderId + "/complete").with(as(cashier)))

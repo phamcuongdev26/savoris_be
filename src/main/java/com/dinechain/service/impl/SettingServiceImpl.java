@@ -4,6 +4,8 @@ import com.dinechain.entity.SettingEntity;
 import com.dinechain.entity.StoredImageEntity;
 import com.dinechain.exception.AppException;
 import com.dinechain.exception.ErrorCode;
+import com.dinechain.image.Cloudinary;
+import com.dinechain.image.ImageFiles;
 import com.dinechain.repository.SettingRepository;
 import com.dinechain.repository.StoredImageRepository;
 import com.dinechain.service.SettingService;
@@ -35,6 +37,7 @@ public class SettingServiceImpl implements SettingService {
 
     private final SettingRepository settingRepository;
     private final StoredImageRepository storedImageRepository;
+    private final Cloudinary cloudinary;
 
     private static final String TRANSFER_QR_IMAGE = "TRANSFER_QR";
     private static final int MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -82,17 +85,14 @@ public class SettingServiceImpl implements SettingService {
     @Override
     @Transactional
     public String uploadTransferQr(Integer staffId, String contentType, byte[] data) {
-        if (data == null || data.length == 0) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Choose an image file");
+        String type = ImageFiles.check(data, MAX_IMAGE_BYTES);
+        if (cloudinary.enabled()) {
+            String url = cloudinary.upload(data, type, "dinechain/transfer-qr");
+            save(staffId, TRANSFER_QR_URL, "Image of the bank QR code web takeaway guests transfer to", url);
+            log.info("Transfer QR image uploaded to Cloudinary by staff {}", staffId);
+            return url;
         }
-        if (data.length > MAX_IMAGE_BYTES) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Image must be at most 2 MB");
-        }
-        // Trust the bytes, not the file name or the browser's content type
-        String type = sniff(data);
-        if (type == null) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Only PNG, JPEG or WebP images are accepted");
-        }
+        // Without Cloudinary the picture is kept in the database and served by the API
         StoredImageEntity image = storedImageRepository.findById(TRANSFER_QR_IMAGE).orElseGet(StoredImageEntity::new);
         image.setImageKey(TRANSFER_QR_IMAGE);
         image.setContentType(type);
@@ -152,14 +152,6 @@ public class SettingServiceImpl implements SettingService {
             .map(SettingEntity::getSettingValue)
             .filter(v -> !v.isBlank())
             .orElse(null);
-    }
-
-    private static String sniff(byte[] d) {
-        if (d.length > 8 && (d[0] & 0xff) == 0x89 && d[1] == 'P' && d[2] == 'N' && d[3] == 'G') return "image/png";
-        if (d.length > 3 && (d[0] & 0xff) == 0xff && (d[1] & 0xff) == 0xd8 && (d[2] & 0xff) == 0xff) return "image/jpeg";
-        if (d.length > 12 && d[0] == 'R' && d[1] == 'I' && d[2] == 'F' && d[3] == 'F'
-            && d[8] == 'W' && d[9] == 'E' && d[10] == 'B' && d[11] == 'P') return "image/webp";
-        return null;
     }
 
     private void save(Integer staffId, String key, String description, String value) {
