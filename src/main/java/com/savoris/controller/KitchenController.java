@@ -1,0 +1,65 @@
+package com.savoris.controller;
+
+import com.savoris.dto.response.BranchLoadResponse;
+import com.savoris.dto.response.KitchenTicketResponse;
+import com.savoris.security.CurrentUser;
+import com.savoris.service.KitchenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import com.savoris.security.Roles;
+import org.springframework.security.access.prepost.PreAuthorize;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/kitchen")
+@RequiredArgsConstructor
+@Tag(name = "Kitchen", description = "Kitchen display (KDS) and peak-hour load")
+public class KitchenController {
+
+    private final KitchenService kitchenService;
+
+    @GetMapping("/branches/{branchId}/queue")
+    @Operation(summary = "Hàng đợi bếp", description = "Các món chờ nấu, đang nấu, đã xong chờ bưng; món gọi trước đứng trước")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
+    public ResponseEntity<List<KitchenTicketResponse>> getQueue(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(kitchenService.getQueue(staffId, branchId));
+    }
+
+    @GetMapping("/branches/{branchId}/load")
+    @Operation(summary = "Tải bếp", description = "Số phần đang chờ/nấu, % công suất, thời gian chờ ước tính")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
+    public ResponseEntity<BranchLoadResponse> getLoad(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(kitchenService.getLoad(staffId, branchId));
+    }
+
+    @PutMapping("/items/{itemId}/start")
+    @Operation(summary = "Nhận nấu món", description = "PENDING → COOKING. Trả 409 nếu người khác đã nhận")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.KITCHEN)
+    public ResponseEntity<KitchenTicketResponse> startCooking(@CurrentUser Integer staffId, @PathVariable Integer itemId) {
+        return ResponseEntity.ok(kitchenService.startCooking(staffId, itemId));
+    }
+
+    @PutMapping("/items/{itemId}/ready")
+    @Operation(summary = "Món đã xong", description = "COOKING → READY")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.KITCHEN)
+    public ResponseEntity<KitchenTicketResponse> markReady(@CurrentUser Integer staffId, @PathVariable Integer itemId) {
+        return ResponseEntity.ok(kitchenService.markReady(staffId, itemId));
+    }
+
+    @PutMapping("/items/{itemId}/served")
+    @Operation(summary = "Đã bưng món ra", description = "READY → SERVED")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.KITCHEN)
+    public ResponseEntity<KitchenTicketResponse> markServed(@CurrentUser Integer staffId, @PathVariable Integer itemId) {
+        return ResponseEntity.ok(kitchenService.markServed(staffId, itemId));
+    }
+}

@@ -1,0 +1,2625 @@
+{
+  "info": {
+    "_postman_id": "536b14dd-1b1e-568f-8487-43444a66fd09",
+    "name": "Savoris API",
+    "description": "Đủ 129 API của Savoris, mỗi API một request.\n\nCách dùng: chạy **1. Đăng nhập → Nhân viên đăng nhập** trước (token tự lưu), rồi gọi API bất kỳ.\nMặc định đăng nhập bằng admin (chủ chuỗi, gọi được mọi API). Đổi username trong body để thử vai trò khác: quanly, thungan, phucvu, daubep, kho — mật khẩu chung 12345.\n\nDatabase mới chỉ có 4 chi nhánh: tạo khu vực → bàn (lưu tableId, qrToken), danh mục, món trước khi gọi món. Thư mục \"Khách quét QR gọi món\" không cần token: qrToken lấy từ request Thêm bàn.\n\nRequest \"Tạo ...\" tự lưu id vừa tạo vào biến (orderId, customerId...). Các request Xoá/Ngừng chỉ tác động lên đối tượng vừa tạo trong collection này. Sửa id mặc định ở tab Variables của collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Dates used in request bodies, refreshed before every request",
+          "const pad = n => String(n).padStart(2, '0');",
+          "const local = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;",
+          "const now = new Date();",
+          "pm.collectionVariables.set('today', local(now).slice(0, 10));",
+          "pm.collectionVariables.set('tomorrow', local(new Date(now.getTime() + 86400000)).slice(0, 10));",
+          "const evening = new Date(now.getTime() + 86400000); evening.setHours(19, 0, 0, 0);",
+          "pm.collectionVariables.set('tomorrowEvening', local(evening));",
+          "pm.collectionVariables.set('nowIso', local(new Date(now.getTime() - 3600000)));",
+          "pm.collectionVariables.set('nextMonthIso', local(new Date(now.getTime() + 30 * 86400000)));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Đăng nhập",
+      "item": [
+        {
+          "name": "Nhân viên đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"token\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "`POST /auth/login`\n\nXác thực nhân viên bằng username và password, trả về access token và refresh token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Thông tin nhân viên đang đăng nhập",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/auth/me",
+            "description": "`GET /auth/me`\n\nLấy thông tin của nhân viên hiện tại từ JWT token"
+          }
+        },
+        {
+          "name": "Lấy access token mới",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"token\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "`POST /auth/refresh`\n\nSử dụng refresh token để lấy access token mới (không cần đăng nhập lại)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Đổi mật khẩu",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/me/password",
+            "description": "`PUT /auth/me/password`\n\nĐổi mật khẩu của nhân viên hiện tại",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"12345\",\n  \"newPassword\": \"12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng xuất",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout",
+            "description": "`POST /auth/logout`\n\nThu hồi refresh token hiện tại (session sẽ bị hủy)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Chi nhánh",
+      "item": [
+        {
+          "name": "Tạo chi nhánh mới",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newBranchId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches",
+            "description": "`POST /branches`\n\nTạo một chi nhánh mới với thông tin cơ bản",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CN{{$randomInt}}\",\n  \"name\": \"Savoris chi nhánh mới\",\n  \"address\": \"10 Tràng Tiền\",\n  \"city\": \"Hà Nội\",\n  \"phone\": \"0243000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches",
+            "description": "`GET /branches`\n\nLấy danh sách tất cả chi nhánh hoạt động"
+          }
+        },
+        {
+          "name": "Tìm kiếm chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/search?q=a",
+            "description": "`GET /branches/search`\n\nTìm kiếm chi nhánh theo tên"
+          }
+        },
+        {
+          "name": "Lấy thông tin chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}",
+            "description": "`GET /branches/{branchId}`\n\nLấy chi tiết thông tin của một chi nhánh"
+          }
+        },
+        {
+          "name": "Cập nhật chi nhánh",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches/{{branchId}}",
+            "description": "`PUT /branches/{branchId}`\n\nCập nhật thông tin của chi nhánh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Savoris chi nhánh 1\",\n  \"address\": \"1 Phố Huế\",\n  \"city\": \"Hà Nội\",\n  \"phone\": \"0243900001\",\n  \"kitchenCapacity\": 40,\n  \"latitude\": 21.029102,\n  \"longitude\": 105.849476\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá chi nhánh",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{newBranchId}}",
+            "description": "`DELETE /branches/{branchId}`\n\nDeactivate chi nhánh (đánh dấu là không hoạt động)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Bàn",
+      "item": [
+        {
+          "name": "Thêm khu vực",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"areaId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches/{{branchId}}/areas",
+            "description": "`POST /branches/{branchId}/areas`\n\nVí dụ Tầng 1, Sân vườn",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tầng 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Khu vực của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/areas",
+            "description": "`GET /branches/{branchId}/areas`"
+          }
+        },
+        {
+          "name": "Thêm bàn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"tableId\", body.id);",
+                  "    pm.collectionVariables.set(\"qrToken\", body.qrToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/areas/{{areaId}}/tables",
+            "description": "`POST /areas/{areaId}/tables`\n\nTên bàn duy nhất trong khu, ví dụ A01",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"B{{$randomInt}}\",\n  \"capacity\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sơ đồ bàn",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/tables",
+            "description": "`GET /branches/{branchId}/tables`\n\nDanh sách bàn của chi nhánh và trạng thái (trống / có khách)"
+          }
+        },
+        {
+          "name": "Đổi tên khu vực",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/areas/{{areaId}}",
+            "description": "`PUT /areas/{areaId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tầng 1 (trong nhà)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sửa bàn",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/tables/{{tableId}}",
+            "description": "`PUT /tables/{tableId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"B{{$randomInt}}\",\n  \"capacity\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá khu vực",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// pm.variables also sees environment values (e.g. a different baseUrl)",
+                  "pm.sendRequest({",
+                  "    url: pm.variables.get('baseUrl') + '/branches/' + pm.variables.get('branchId') + '/areas',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.variables.get('token') },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ name: 'Khu nháp ' + Date.now() }) }",
+                  "}, (err, res) => { if (!err && res.code === 201) pm.collectionVariables.set('deleteAreaId', res.json().id); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/areas/{{deleteAreaId}}",
+            "description": "`DELETE /areas/{areaId}`\n\nChỉ xoá được khu không còn bàn\n\nĐể demo, trước khi gọi sẽ tự tạo một khu nháp rồi xoá khu đó (khu còn bàn thì không xoá được)."
+          }
+        },
+        {
+          "name": "Xoá bàn",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// pm.variables also sees environment values (e.g. a different baseUrl)",
+                  "pm.sendRequest({",
+                  "    url: pm.variables.get('baseUrl') + '/areas/' + pm.variables.get('areaId') + '/tables',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.variables.get('token') },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ name: 'N' + (Date.now() % 100000), capacity: 2 }) }",
+                  "}, (err, res) => { if (!err && res.code === 201) pm.collectionVariables.set('deleteTableId', res.json().id); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/tables/{{deleteTableId}}",
+            "description": "`DELETE /tables/{tableId}`\n\nBàn đã có đơn thì không xoá được (giữ lịch sử)\n\nĐể demo, trước khi gọi sẽ tự tạo một bàn nháp rồi xoá bàn đó (bàn đã có đơn thì không xoá được)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Danh mục món",
+      "item": [
+        {
+          "name": "Tạo danh mục menu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newCategoryId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-categories",
+            "description": "`POST /menu-categories`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Món mới {{$randomInt}}\",\n  \"sortOrder\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Tìm kiếm danh mục",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-categories/search?q=a",
+            "description": "`GET /menu-categories/search`"
+          }
+        },
+        {
+          "name": "Lấy danh mục menu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-categories/{{categoryId}}",
+            "description": "`GET /menu-categories/{categoryId}`"
+          }
+        },
+        {
+          "name": "Cập nhật danh mục menu",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-categories/{{newCategoryId}}",
+            "description": "`PUT /menu-categories/{categoryId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Món mới (đổi tên)\",\n  \"sortOrder\": 3,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá danh mục menu",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/menu-categories/{{newCategoryId}}",
+            "description": "`DELETE /menu-categories/{categoryId}`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Món ăn (menu chung)",
+      "item": [
+        {
+          "name": "Tạo mục menu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newMenuItemId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-items",
+            "description": "`POST /menu-items`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": {{categoryId}},\n  \"code\": \"MON-{{$timestamp}}\",\n  \"name\": \"Bún bò Huế\",\n  \"description\": \"Bún bò cay\",\n  \"basePrice\": 50000,\n  \"unit\": \"phần\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách mục theo danh mục",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/category/{{categoryId}}",
+            "description": "`GET /menu-items/category/{categoryId}`"
+          }
+        },
+        {
+          "name": "Tìm kiếm mục menu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/search?q=a",
+            "description": "`GET /menu-items/search`"
+          }
+        },
+        {
+          "name": "Lấy mục menu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/{{menuItemId}}",
+            "description": "`GET /menu-items/{itemId}`"
+          }
+        },
+        {
+          "name": "Cập nhật mục menu",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-items/{{newMenuItemId}}",
+            "description": "`PUT /menu-items/{itemId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bún bò Huế đặc biệt\",\n  \"basePrice\": 65000,\n  \"unit\": \"phần\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá mục menu",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/{{newMenuItemId}}",
+            "description": "`DELETE /menu-items/{itemId}`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5b. Công thức món",
+      "item": [
+        {
+          "name": "Xem công thức món",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/{{menuItemId}}/recipe",
+            "description": "`GET /menu-items/{menuItemId}/recipe`"
+          }
+        },
+        {
+          "name": "Đặt công thức món",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-items/{{menuItemId}}/recipe",
+            "description": "`PUT /menu-items/{menuItemId}/recipe`\n\nThay toàn bộ công thức (định lượng cho 1 phần). Danh sách rỗng = bỏ trừ kho cho món này",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lines\": [\n    {\n      \"ingredientId\": {{ingredientId}},\n      \"quantity\": 0.2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Menu chi nhánh",
+      "item": [
+        {
+          "name": "Menu chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/menu",
+            "description": "`GET /branches/{branchId}/menu`\n\nGiá đang áp dụng tại chi nhánh và món nào còn bán"
+          }
+        },
+        {
+          "name": "Món không bán ở chi nhánh nào",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/branch-exclusions",
+            "description": "`GET /menu-items/branch-exclusions`\n\nDanh sách cặp (món, chi nhánh) không bán; dùng để hiện “bán ở từng chi nhánh”"
+          }
+        },
+        {
+          "name": "Chi nhánh bán món này",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/menu-items/{{menuItemId}}/branches",
+            "description": "`GET /menu-items/{itemId}/branches`\n\nMọi chi nhánh đang hoạt động, offered = có bán món này hay không"
+          }
+        },
+        {
+          "name": "Báo hết món / bán lại",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches/{{branchId}}/menu/{{menuItemId}}/availability",
+            "description": "`PUT /branches/{branchId}/menu/{menuItemId}/availability`\n\n{\"available\": false} = hết món; đơn mới gọi món này bị từ chối",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"available\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Giá riêng của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches/{{branchId}}/menu/{{menuItemId}}/price",
+            "description": "`PUT /branches/{branchId}/menu/{menuItemId}/price`\n\n{\"price\": 60000}; {\"price\": null} = quay về giá chung của chuỗi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 60000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Chọn chi nhánh bán món",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/menu-items/{{menuItemId}}/branches",
+            "description": "`PUT /menu-items/{itemId}/branches`\n\n{\"branchIds\": [1, 3]} = chỉ CN có id 1 và 3 bán món này; chi nhánh khác không hiện món",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchIds\": [\n    {{branchId}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Khách hàng & điểm",
+      "item": [
+        {
+          "name": "Tạo khách hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newCustomerId\", body.id);",
+                  "    pm.collectionVariables.set(\"newCustomerPhone\", body.phone);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/customers",
+            "description": "`POST /customers`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phone\": \"0{{$timestamp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Tìm khách theo số điện thoại",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customers/by-phone?phone={{newCustomerPhone}}",
+            "description": "`GET /customers/by-phone`\n\nThu ngân hỏi SĐT để tích / dùng điểm"
+          }
+        },
+        {
+          "name": "Tìm kiếm khách hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customers/search?q=a",
+            "description": "`GET /customers/search`"
+          }
+        },
+        {
+          "name": "Lấy thông tin khách hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "description": "`GET /customers/{customerId}`"
+          }
+        },
+        {
+          "name": "Lịch sử điểm",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customers/{{customerId}}/points",
+            "description": "`GET /customers/{customerId}/points`\n\nĐiểm cộng khi hoàn tất đơn, trừ khi dùng; mới nhất trước"
+          }
+        },
+        {
+          "name": "Cập nhật khách hàng",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/customers/{{newCustomerId}}",
+            "description": "`PUT /customers/{customerId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A (sửa)\",\n  \"phone\": \"0{{$timestamp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá khách hàng",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/customers/{{newCustomerId}}",
+            "description": "`DELETE /customers/{customerId}`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Khuyến mãi",
+      "item": [
+        {
+          "name": "Tạo mã khuyến mãi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newPromotionId\", body.id);",
+                  "    pm.collectionVariables.set(\"newPromotionCode\", body.code);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/promotions",
+            "description": "`POST /promotions`\n\nPERCENT (có thể giới hạn maxDiscount) hoặc FIXED_AMOUNT; branchIds rỗng = cả chuỗi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"KM{{$timestamp}}\",\n  \"name\": \"Giảm 10% tối đa 50.000\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 10,\n  \"maxDiscount\": 50000,\n  \"minOrderAmount\": 100000,\n  \"startAt\": \"{{nowIso}}\",\n  \"endAt\": \"{{nextMonthIso}}\",\n  \"usageLimit\": 100,\n  \"branchIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách mã khuyến mãi",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/promotions",
+            "description": "`GET /promotions`"
+          }
+        },
+        {
+          "name": "Thử mã",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/promotions/check?code={{newPromotionCode}}&branchId={{branchId}}&orderAmount=150000",
+            "description": "`GET /promotions/check`\n\nXem mã có dùng được cho đơn này không và được giảm bao nhiêu (không trừ lượt dùng)"
+          }
+        },
+        {
+          "name": "Sửa mã khuyến mãi",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/promotions/{{newPromotionId}}",
+            "description": "`PUT /promotions/{promotionId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{newPromotionCode}}\",\n  \"name\": \"Giảm 15% tối đa 50.000\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 15,\n  \"maxDiscount\": 50000,\n  \"minOrderAmount\": 100000,\n  \"startAt\": \"{{nowIso}}\",\n  \"endAt\": \"{{nextMonthIso}}\",\n  \"usageLimit\": 100,\n  \"branchIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ngừng mã khuyến mãi",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/promotions/{{newPromotionId}}/deactivate",
+            "description": "`PUT /promotions/{promotionId}/deactivate`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Cài đặt (VAT)",
+      "item": [
+        {
+          "name": "Link ảnh mã QR chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/settings/transfer-qr",
+            "description": "`GET /settings/transfer-qr`\n\nKhách đặt mang về chọn chuyển khoản sẽ thấy ảnh này"
+          }
+        },
+        {
+          "name": "Thuế VAT hiện tại (%)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/settings/vat",
+            "description": "`GET /settings/vat`"
+          }
+        },
+        {
+          "name": "Đổi link ảnh mã QR chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/settings/transfer-qr",
+            "description": "`PUT /settings/transfer-qr`\n\n{\"url\": \"https://...png\"}; để trống = tắt chuyển khoản",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/ma-qr-ngan-hang.png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Tải ảnh mã QR chuyển khoản lên",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/settings/transfer-qr/image",
+            "description": "`PUT /settings/transfer-qr/image`\n\nForm-data field \"file\": ảnh PNG, JPEG hoặc WebP, tối đa 2MB. Thay link QR bằng ảnh vừa tải\n\nChọn file ảnh ở tab Body → form-data → file.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Ảnh PNG, JPEG hoặc WebP, tối đa 2MB"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Đổi thuế VAT (%)",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/settings/vat",
+            "description": "`PUT /settings/vat`\n\nÁp dụng cho các đơn tạo sau khi đổi; đơn cũ giữ nguyên",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percent\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Tài khoản nhận chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/settings/bank-account",
+            "description": "`GET /settings/bank-account`\n\nMỗi đơn mang về có mã QR riêng (số tiền + mã đơn). autoConfirm = backend đã đặt SEPAY_API_KEY; webhookPath = địa chỉ dán vào SePay"
+          }
+        },
+        {
+          "name": "Đổi tài khoản nhận chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/settings/bank-account",
+            "description": "`PUT /settings/bank-account`\n\nbank là tên viết tắt ngân hàng theo SePay/VietQR (MBBank, Vietcombank...). Để trống cả bank và accountNumber = bỏ tài khoản",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"MBBank\",\n  \"accountNumber\": \"0123456789\",\n  \"accountName\": \"CONG TY SAVORIS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Đơn hàng",
+      "item": [
+        {
+          "name": "Tạo đơn hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"orderId\", body.id);",
+                  "    pm.collectionVariables.set(\"orderItemId\", body.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "`POST /orders`\n\nKhi bếp quá tải, đơn mang đi/giao hàng bị từ chối với mã 503 BRANCH_BUSY; đơn tại bàn luôn được nhận",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": {{branchId}},\n  \"orderType\": \"DINE_IN\",\n  \"tableId\": {{tableId}},\n  \"notes\": \"Bàn gần cửa sổ\",\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 2,\n      \"notes\": \"Ít hành\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lấy đơn hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "`GET /orders/{orderId}`"
+          }
+        },
+        {
+          "name": "Gọi thêm món",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"addedItemId\", body.items[body.items.length - 1].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}/items",
+            "description": "`POST /orders/{orderId}/items`\n\nThêm món vào đơn đang mở (chưa thanh toán); tổng tiền, khuyến mãi, VAT được tính lại",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Huỷ một món",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}/items/{{addedItemId}}/cancel",
+            "description": "`PUT /orders/{orderId}/items/{itemId}/cancel`\n\nMón chưa nấu: nhân viên huỷ được. Món đang nấu / đã xong: chỉ quản lý. Món đã bưng ra: không huỷ được",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Khách đổi ý\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Hủy đơn hàng",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// pm.variables also sees environment values (e.g. a different baseUrl)",
+                  "pm.sendRequest({",
+                  "    url: pm.variables.get('baseUrl') + '/orders',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.variables.get('token') },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ branchId: Number(pm.variables.get('branchId')), orderType: 'TAKEAWAY', items: [{ menuItemId: Number(pm.variables.get('menuItemId')), quantity: 1 }] }) }",
+                  "}, (err, res) => { if (!err && res.code === 201) pm.collectionVariables.set('cancelOrderId', res.json().id); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{cancelOrderId}}/cancel",
+            "description": "`PUT /orders/{orderId}/cancel`\n\nCác món chưa phục vụ cũng bị gỡ khỏi hàng đợi bếp\n\nĐể demo, trước khi gọi sẽ tự tạo một đơn mang đi nháp rồi huỷ đơn đó (đơn chính vẫn giữ để nấu và thanh toán)."
+          }
+        },
+        {
+          "name": "Danh sách đơn hàng đang mở theo chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/branch/{{branchId}}",
+            "description": "`GET /orders/branch/{branchId}`"
+          }
+        },
+        {
+          "name": "Danh sách đơn hàng theo khách hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/customer/{{customerId}}",
+            "description": "`GET /orders/customer/{customerId}`"
+          }
+        },
+        {
+          "name": "Đơn chuyển khoản đã huỷ cần hoàn tiền",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/branch/{{branchId}}/refunds-due",
+            "description": "`GET /orders/branch/{branchId}/refunds-due`\n\nKhách đã báo chuyển khoản rồi đơn bị huỷ, hoặc SePay báo tiền về sau khi đơn đã huỷ. Quyền: thu ngân"
+          }
+        },
+        {
+          "name": "Đã xử lý hoàn tiền",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{cancelOrderId}}/refund-settled",
+            "description": "`PUT /orders/{cancelOrderId}/refund-settled`\n\nThu ngân đã chuyển trả (hoặc kiểm tra là tiền chưa về). Đơn biến khỏi danh sách cần hoàn tiền"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10b. Khách quét QR gọi món",
+      "item": [
+        {
+          "name": "Thông tin bàn và menu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/tables/{{qrToken}}",
+            "description": "`GET /public/tables/{qrToken}`\n\nChi nhánh, khu vực, tên bàn và menu đang bán tại chi nhánh",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Khách gọi món",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/public/tables/{{qrToken}}/orders",
+            "description": "`POST /public/tables/{qrToken}/orders`\n\nMón được thêm vào hoá đơn đang mở của bàn (hoặc mở hoá đơn mới) và chuyển thẳng xuống bếp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 2,\n      \"notes\": \"ít hành\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Hoá đơn đang mở của bàn",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/tables/{{qrToken}}/order",
+            "description": "`GET /public/tables/{qrToken}/order`\n\n204 khi bàn chưa gọi món",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Menu chung của chuỗi",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/menu",
+            "description": "`GET /public/menu`\n\nTrang chủ cho khách: các món đang bán với giá chung; quét QR tại bàn để gọi món",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10c. Khách đặt mang về (web)",
+      "item": [
+        {
+          "name": "Chi nhánh nhận đơn mang về",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/branches",
+            "description": "`GET /public/branches`\n\nacceptingTakeaway=false khi bếp chi nhánh đang quá tải",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Menu mang về của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/branches/{{branchId}}/menu",
+            "description": "`GET /public/branches/{branchId}/menu`\n\nGiá riêng và món hết của chi nhánh",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Đặt món mang về",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"takeawayToken\", body.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/public/takeaway-orders",
+            "description": "`POST /public/takeaway-orders`\n\npayMethod CASH (trả tại quầy) hoặc BANK_TRANSFER (chuyển khoản theo mã QR). Đơn chờ thanh toán, thu ngân thu tiền / xác nhận chuyển khoản xong bếp mới nấu",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": {{branchId}},\n  \"guestName\": \"Chị Lan\",\n  \"guestPhone\": \"0912345678\",\n  \"payMethod\": \"BANK_TRANSFER\",\n  \"notes\": \"Ít cay\",\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Theo dõi đơn mang về",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/takeaway-orders/{{takeawayToken}}",
+            "description": "`GET /public/takeaway-orders/{token}`\n\nTrạng thái thanh toán, món trong bếp, ảnh QR chuyển khoản khi còn chờ chuyển",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Ảnh mã QR chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/images/transfer-qr",
+            "description": "`GET /public/images/transfer-qr`\n\nẢnh chủ chuỗi đã tải lên; 404 khi chưa có",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Khách báo đã chuyển khoản",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/public/takeaway-orders/{{takeawayToken}}/transferred",
+            "description": "`POST /public/takeaway-orders/{takeawayToken}/transferred`\n\nChỉ cho đơn chuyển khoản đang chờ thanh toán. Đơn đã báo thì không tự huỷ sau 30 phút; thu ngân thấy nhắc kiểm tra tiền về",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Khoá công khai Web Push",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/push/public-key",
+            "description": "`GET /public/push/public-key`\n\nKhoá VAPID để trình duyệt đăng ký nhận thông báo",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Đăng ký thông báo món xong",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/public/takeaway-orders/{{takeawayToken}}/push-subscriptions",
+            "description": "`POST /public/takeaway-orders/{takeawayToken}/push-subscriptions`\n\nBody là subscription.toJSON() của trình duyệt. Chỉ nhận endpoint https của dịch vụ push thật (FCM, Mozilla, Windows, Apple). Trả 204",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"https://fcm.googleapis.com/fcm/send/...\",\n  \"keys\": {\n    \"p256dh\": \"...\",\n    \"auth\": \"...\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Webhook SePay (giả lập tiền về)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Apikey {{sepayApiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/public/sepay/webhook",
+            "description": "`POST /public/sepay/webhook`\n\nSePay gọi khi có giao dịch. Header Authorization: Apikey <SEPAY_API_KEY>. Tiền vào đủ, nội dung có mã đơn thì đơn tự thanh toán và xuống bếp. 404 khi backend chưa đặt SEPAY_API_KEY",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"gateway\": \"MBBank\",\n  \"accountNumber\": \"0123456789\",\n  \"transferType\": \"in\",\n  \"transferAmount\": 64800,\n  \"content\": \"B1-261010-0001\",\n  \"referenceCode\": \"FT123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Bếp",
+      "item": [
+        {
+          "name": "Hàng đợi bếp",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/kitchen/branches/{{branchId}}/queue",
+            "description": "`GET /kitchen/branches/{branchId}/queue`\n\nCác món chờ nấu, đang nấu, đã xong chờ bưng; món gọi trước đứng trước"
+          }
+        },
+        {
+          "name": "Tải bếp",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/kitchen/branches/{{branchId}}/load",
+            "description": "`GET /kitchen/branches/{branchId}/load`\n\nSố phần đang chờ/nấu, % công suất, thời gian chờ ước tính"
+          }
+        },
+        {
+          "name": "Nhận nấu món",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/kitchen/items/{{orderItemId}}/start",
+            "description": "`PUT /kitchen/items/{itemId}/start`\n\nPENDING → COOKING. Trả 409 nếu người khác đã nhận"
+          }
+        },
+        {
+          "name": "Món đã xong",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/kitchen/items/{{orderItemId}}/ready",
+            "description": "`PUT /kitchen/items/{itemId}/ready`\n\nCOOKING → READY"
+          }
+        },
+        {
+          "name": "Đã bưng món ra",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/kitchen/items/{{orderItemId}}/served",
+            "description": "`PUT /kitchen/items/{itemId}/served`\n\nREADY → SERVED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Thanh toán (tiền mặt)",
+      "item": [
+        {
+          "name": "Thanh toán tiền mặt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"paymentId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "description": "`POST /payments`\n\nNhập tiền khách đưa (cashReceived), server tính tiền thối. Chỉ nhận CASH",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": {{orderId}},\n  \"cashReceived\": 200000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lấy thông tin thanh toán",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payments/{{paymentId}}",
+            "description": "`GET /payments/{paymentId}`"
+          }
+        },
+        {
+          "name": "Lấy thanh toán theo đơn hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payments/order/{{orderId}}",
+            "description": "`GET /payments/order/{orderId}`"
+          }
+        },
+        {
+          "name": "Hoàn thành đơn hàng",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{orderId}}/complete",
+            "description": "`PUT /orders/{orderId}/complete`\n\nChỉ hoàn thành được khi mọi món đã phục vụ hoặc đã huỷ"
+          }
+        },
+        {
+          "name": "Hoàn tiền",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/payments/{{paymentId}}/refund",
+            "description": "`PUT /payments/{paymentId}/refund`\n\nChỉ quản lý / chủ chuỗi"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Đặt bàn",
+      "item": [
+        {
+          "name": "Tạo đặt bàn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"reservationId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reservations",
+            "description": "`POST /reservations`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": {{branchId}},\n  \"customerId\": {{customerId}},\n  \"reservationDate\": \"{{tomorrowEvening}}\",\n  \"numberOfGuests\": 4,\n  \"notes\": \"Sinh nhật\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lấy đặt bàn",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/reservations/{{reservationId}}",
+            "description": "`GET /reservations/{reservationId}`"
+          }
+        },
+        {
+          "name": "Danh sách đặt bàn theo chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/reservations/branch/{{branchId}}",
+            "description": "`GET /reservations/branch/{branchId}`"
+          }
+        },
+        {
+          "name": "Danh sách đặt bàn theo khách hàng",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/reservations/customer/{{customerId}}",
+            "description": "`GET /reservations/customer/{customerId}`"
+          }
+        },
+        {
+          "name": "Xác nhận đặt bàn",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/reservations/{{reservationId}}/confirm",
+            "description": "`PUT /reservations/{reservationId}/confirm`"
+          }
+        },
+        {
+          "name": "Hủy đặt bàn",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/reservations/{{reservationId}}/cancel",
+            "description": "`PUT /reservations/{reservationId}/cancel`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Nhân viên",
+      "item": [
+        {
+          "name": "Tạo nhân viên mới",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"newStaffId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/staff",
+            "description": "`POST /staff`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"NV{{$randomInt}}{{$randomInt}}\",\n  \"fullName\": \"Thu ngân mới\",\n  \"username\": \"nv{{$timestamp}}\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111111\",\n  \"role\": \"CASHIER\",\n  \"branchId\": {{branchId}},\n  \"hourlyRate\": 30000,\n  \"password\": \"Welcome@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách nhân viên theo chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/staff/branch/{{branchId}}",
+            "description": "`GET /staff/branch/{branchId}`"
+          }
+        },
+        {
+          "name": "Tìm kiếm nhân viên",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/staff/search?q=a",
+            "description": "`GET /staff/search`"
+          }
+        },
+        {
+          "name": "Lấy thông tin nhân viên",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/staff/{{staffId}}",
+            "description": "`GET /staff/{staffId}`"
+          }
+        },
+        {
+          "name": "Cập nhật nhân viên",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/staff/{{newStaffId}}",
+            "description": "`PUT /staff/{staffId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Thu ngân mới (sửa)\",\n  \"email\": \"nv{{$timestamp}}@savoris.vn\",\n  \"phone\": \"0911111112\",\n  \"role\": \"CASHIER\",\n  \"hourlyRate\": 32000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đặt lại mật khẩu cho nhân viên",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/staff/{{newStaffId}}/password",
+            "description": "`PUT /staff/{staffId}/password`\n\nDùng khi nhân viên quên mật khẩu. Quản lý chỉ đặt lại cho nhân viên chi nhánh mình; mọi phiên đăng nhập cũ bị thu hồi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"Welcome@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xoá nhân viên",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/staff/{{newStaffId}}",
+            "description": "`DELETE /staff/{staffId}`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Ca làm & chấm công",
+      "item": [
+        {
+          "name": "Tạo ca",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"shiftId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/branches/{{branchId}}/shifts",
+            "description": "`POST /branches/{branchId}/shifts`\n\nVí dụ Ca sáng 07:00 - 15:00; giờ kết thúc nhỏ hơn giờ bắt đầu = ca qua đêm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ca sáng\",\n  \"startTime\": \"07:00\",\n  \"endTime\": \"15:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách ca của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/shifts",
+            "description": "`GET /branches/{branchId}/shifts`"
+          }
+        },
+        {
+          "name": "Xếp nhân viên vào ca",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"assignmentId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/shifts/{{shiftId}}/assignments",
+            "description": "`POST /shifts/{shiftId}/assignments`\n\nNhân viên phải thuộc chi nhánh của ca; không xếp ngày đã qua",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffId\": {{staffId}},\n  \"workDate\": \"{{tomorrow}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lịch làm việc của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/schedule?from={{today}}&to={{today}}",
+            "description": "`GET /branches/{branchId}/schedule`\n\nTối đa 62 ngày, ví dụ ?from=2026-10-12&to=2026-10-18"
+          }
+        },
+        {
+          "name": "Lịch làm việc của tôi",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/shifts/me?from={{today}}&to={{today}}",
+            "description": "`GET /shifts/me`"
+          }
+        },
+        {
+          "name": "Chấm công vào",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/shift-assignments/{{assignmentId}}/check-in",
+            "description": "`PUT /shift-assignments/{assignmentId}/check-in`\n\nChỉ ca của chính mình, từ 30 phút trước giờ vào ca đến hết ca\n\nĐăng nhập bằng chính nhân viên được xếp ca rồi mới gọi (chủ chuỗi gọi sẽ bị 403)."
+          }
+        },
+        {
+          "name": "Chấm công ra",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/shift-assignments/{{assignmentId}}/check-out",
+            "description": "`PUT /shift-assignments/{assignmentId}/check-out`\n\n\n\nĐăng nhập bằng chính nhân viên được xếp ca rồi mới gọi (chủ chuỗi gọi sẽ bị 403)."
+          }
+        },
+        {
+          "name": "Bảng công",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/branches/{{branchId}}/timesheet?from={{today}}&to={{today}}",
+            "description": "`GET /branches/{branchId}/timesheet`\n\nGiờ làm thực tế (vào → ra) và tiền công = giờ x lương giờ, theo từng nhân viên"
+          }
+        },
+        {
+          "name": "Bỏ xếp ca",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/shift-assignments/{{assignmentId}}",
+            "description": "`DELETE /shift-assignments/{assignmentId}`\n\nKhông bỏ được khi nhân viên đã chấm công vào"
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Kho",
+      "item": [
+        {
+          "name": "Nhập tồn kho (tay hoặc từ file Excel/CSV)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/inventory/branch/{{branchId}}/import",
+            "description": "`POST /inventory/branch/{branchId}/import`\n\nrows: [{name, unit, quantity, minStock}]. Nguyên liệu chưa có sẽ được tạo (cần unit); số lượng là tồn thực tế hiện tại",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rows\": [\n    {\n      \"name\": \"Coca-Cola chai\",\n      \"unit\": \"chai\",\n      \"quantity\": 48,\n      \"minStock\": 24\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách kho theo chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/inventory/branch/{{branchId}}",
+            "description": "`GET /inventory/branch/{branchId}`"
+          }
+        },
+        {
+          "name": "Lấy kho nguyên liệu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/inventory/branch/{{branchId}}/ingredient/{{ingredientId}}",
+            "description": "`GET /inventory/branch/{branchId}/ingredient/{ingredientId}`"
+          }
+        },
+        {
+          "name": "Danh sách hàng hết/thiếu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/inventory/branch/{{branchId}}/low-stock",
+            "description": "`GET /inventory/branch/{branchId}/low-stock`"
+          }
+        },
+        {
+          "name": "Cập nhật kho nguyên liệu",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/inventory/branch/{{branchId}}/ingredient/{{ingredientId}}",
+            "description": "`PUT /inventory/branch/{branchId}/ingredient/{ingredientId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 50,\n  \"notes\": \"Kiểm kho cuối ngày\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Nhập hàng",
+      "item": [
+        {
+          "name": "Thêm nhà cung cấp",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"supplierId\", body.id);",
+                  "    pm.collectionVariables.set(\"newSupplierId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/suppliers",
+            "description": "`POST /suppliers`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Công ty Thực phẩm ABC\",\n  \"phone\": \"0243111222\",\n  \"email\": \"ncc{{$timestamp}}@ncc.vn\",\n  \"address\": \"Hà Nội\",\n  \"taxCode\": \"0101234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách nhà cung cấp đang hợp tác",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/suppliers",
+            "description": "`GET /suppliers`"
+          }
+        },
+        {
+          "name": "Sửa nhà cung cấp",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/suppliers/{{newSupplierId}}",
+            "description": "`PUT /suppliers/{supplierId}`",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Công ty Thực phẩm ABC (sửa)\",\n  \"phone\": \"0243111333\",\n  \"email\": \"ncc{{$timestamp}}@ncc.vn\",\n  \"address\": \"Hà Nội\",\n  \"taxCode\": \"0101234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Thêm nguyên liệu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"ingredientId\", body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/ingredients",
+            "description": "`POST /ingredients`\n\nDanh mục nguyên liệu dùng chung cả chuỗi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"NL-{{$timestamp}}\",\n  \"name\": \"Hành lá\",\n  \"unit\": \"kg\",\n  \"minStock\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Danh sách nguyên liệu",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/ingredients",
+            "description": "`GET /ingredients`"
+          }
+        },
+        {
+          "name": "Lập phiếu nhập (nháp)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"purchaseOrderId\", body.id);",
+                  "    pm.collectionVariables.set(\"purchaseOrderItemId\", body.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/purchase-orders",
+            "description": "`POST /purchase-orders`\n\nKho hoặc quản lý lập; chờ quản lý duyệt đặt hàng",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": {{branchId}},\n  \"supplierId\": {{supplierId}},\n  \"note\": \"Nhập cuối tuần\",\n  \"items\": [\n    {\n      \"ingredientId\": {{ingredientId}},\n      \"quantity\": 10,\n      \"unitPrice\": 250000\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xem phiếu nhập",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/purchase-orders/{{purchaseOrderId}}",
+            "description": "`GET /purchase-orders/{purchaseOrderId}`"
+          }
+        },
+        {
+          "name": "Phiếu nhập của chi nhánh",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/purchase-orders/branch/{{branchId}}",
+            "description": "`GET /purchase-orders/branch/{branchId}`\n\nMới nhất trước"
+          }
+        },
+        {
+          "name": "Duyệt & đặt hàng",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/purchase-orders/{{purchaseOrderId}}/order",
+            "description": "`PUT /purchase-orders/{purchaseOrderId}/order`\n\nDRAFT → ORDERED; chỉ quản lý / chủ chuỗi"
+          }
+        },
+        {
+          "name": "Nhận hàng",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/purchase-orders/{{purchaseOrderId}}/receive",
+            "description": "`PUT /purchase-orders/{purchaseOrderId}/receive`\n\nORDERED → RECEIVED, cộng kho. Không gửi body = nhận đủ; gửi items để ghi số lượng thực nhận",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"itemId\": {{purchaseOrderItemId}},\n      \"receivedQuantity\": 10\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Huỷ phiếu nhập",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// pm.variables also sees environment values (e.g. a different baseUrl)",
+                  "pm.sendRequest({",
+                  "    url: pm.variables.get('baseUrl') + '/purchase-orders',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.variables.get('token') },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ branchId: Number(pm.variables.get('branchId')), supplierId: Number(pm.variables.get('supplierId')), items: [{ ingredientId: Number(pm.variables.get('ingredientId')), quantity: 1, unitPrice: 1000 }] }) }",
+                  "}, (err, res) => { if (!err && res.code === 201) pm.collectionVariables.set('cancelPurchaseOrderId', res.json().id); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/purchase-orders/{{cancelPurchaseOrderId}}/cancel",
+            "description": "`PUT /purchase-orders/{purchaseOrderId}/cancel`\n\nChỉ khi chưa nhận hàng\n\nĐể demo, trước khi gọi sẽ tự tạo một phiếu nhập nháp rồi huỷ phiếu đó (phiếu đã nhận hàng thì không huỷ được)."
+          }
+        },
+        {
+          "name": "Ngừng hợp tác nhà cung cấp",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/suppliers/{{newSupplierId}}/deactivate",
+            "description": "`PUT /suppliers/{supplierId}/deactivate`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Dashboard chuỗi",
+      "item": [
+        {
+          "name": "Tổng quan toàn chuỗi",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/dashboard/chain",
+            "description": "`GET /dashboard/chain`\n\nĐơn đang mở, doanh thu hôm nay và tải bếp của từng chi nhánh"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "branchId",
+      "value": "1"
+    },
+    {
+      "key": "areaId",
+      "value": ""
+    },
+    {
+      "key": "tableId",
+      "value": ""
+    },
+    {
+      "key": "qrToken",
+      "value": ""
+    },
+    {
+      "key": "deleteAreaId",
+      "value": ""
+    },
+    {
+      "key": "deleteTableId",
+      "value": ""
+    },
+    {
+      "key": "takeawayToken",
+      "value": ""
+    },
+    {
+      "key": "menuItemId",
+      "value": "1"
+    },
+    {
+      "key": "categoryId",
+      "value": "1"
+    },
+    {
+      "key": "customerId",
+      "value": "1"
+    },
+    {
+      "key": "staffId",
+      "value": "3"
+    },
+    {
+      "key": "ingredientId",
+      "value": "1"
+    },
+    {
+      "key": "supplierId",
+      "value": "1"
+    },
+    {
+      "key": "shiftId",
+      "value": "1"
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "orderItemId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "reservationId",
+      "value": ""
+    },
+    {
+      "key": "assignmentId",
+      "value": ""
+    },
+    {
+      "key": "purchaseOrderId",
+      "value": ""
+    },
+    {
+      "key": "purchaseOrderItemId",
+      "value": ""
+    },
+    {
+      "key": "promotionId",
+      "value": "1"
+    },
+    {
+      "key": "newBranchId",
+      "value": ""
+    },
+    {
+      "key": "newCategoryId",
+      "value": ""
+    },
+    {
+      "key": "newMenuItemId",
+      "value": ""
+    },
+    {
+      "key": "newCustomerId",
+      "value": ""
+    },
+    {
+      "key": "newStaffId",
+      "value": ""
+    },
+    {
+      "key": "newPromotionId",
+      "value": ""
+    },
+    {
+      "key": "newPromotionCode",
+      "value": ""
+    },
+    {
+      "key": "newSupplierId",
+      "value": ""
+    },
+    {
+      "key": "newCustomerPhone",
+      "value": ""
+    },
+    {
+      "key": "addedItemId",
+      "value": ""
+    },
+    {
+      "key": "cancelOrderId",
+      "value": ""
+    },
+    {
+      "key": "cancelPurchaseOrderId",
+      "value": ""
+    },
+    {
+      "key": "sepayApiKey",
+      "value": ""
+    }
+  ]
+}
