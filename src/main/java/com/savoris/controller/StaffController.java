@@ -5,6 +5,7 @@ import com.savoris.dto.request.ResetPasswordRequest;
 import com.savoris.dto.request.UpdateStaffRequest;
 import com.savoris.dto.response.StaffDetailResponse;
 import com.savoris.dto.response.ErrorResponse;
+import com.savoris.service.AuditLogger;
 import com.savoris.service.StaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,6 +32,7 @@ import java.util.List;
 public class StaffController {
 
     private final StaffService staffService;
+    private final AuditLogger auditLogger;
 
     @PostMapping
     @Operation(summary = "Tạo nhân viên mới")
@@ -41,7 +43,10 @@ public class StaffController {
     })
     @PreAuthorize(Roles.MANAGEMENT)
     public ResponseEntity<StaffDetailResponse> createStaff(@CurrentUser Integer actorId, @Valid @RequestBody CreateStaffRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(staffService.createStaff(actorId, request));
+        StaffDetailResponse created = staffService.createStaff(actorId, request);
+        auditLogger.log(actorId, request.getBranchId(), "CREATE", "STAFF", created.getId(), null,
+            "{\"username\":\"" + request.getUsername() + "\",\"role\":\"" + request.getRole() + "\"}");
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{staffId}")
@@ -69,6 +74,7 @@ public class StaffController {
     @PreAuthorize(Roles.MANAGEMENT)
     public ResponseEntity<Void> deleteStaff(@CurrentUser Integer actorId, @PathVariable Integer staffId) {
         staffService.deleteStaff(actorId, staffId);
+        auditLogger.log(actorId, null, "RESIGN", "STAFF", staffId, null, null);
         return ResponseEntity.noContent().build();
     }
 
