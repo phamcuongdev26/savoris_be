@@ -75,10 +75,10 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
             .sorted(Comparator.comparing(BranchEntity::getCode))
             .toList();
         Map<Integer, BranchLoadResponse> loads = kitchenService.computeLoadOfBranches(branches);
-        boolean transfer = settingService.transferAvailable();
         return branches.stream()
             .map(b -> new PublicBranchResponse(b.getId(), b.getCode(), b.getName(), b.getAddress(),
-                loads.get(b.getId()).isAcceptingTakeaway(), loads.get(b.getId()).getEstimatedWaitMinutes(), transfer,
+                loads.get(b.getId()).isAcceptingTakeaway(), loads.get(b.getId()).getEstimatedWaitMinutes(),
+                settingService.transferAvailable(b.getId()),
                 b.getCity(), b.getLatitude(), b.getLongitude()))
             .toList();
     }
@@ -111,10 +111,10 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
         boolean paid = paymentRepository.existsByOrderIdAndStatus(order.getId(), PaymentStatus.PAID);
         // The QR is only worth showing while the guest still has to transfer
         boolean transferring = order.getStatus() == OrderStatus.AWAITING_PAYMENT && order.getPayMethod() == PaymentMethod.BANK_TRANSFER;
-        SettingService.BankAccount account = transferring ? settingService.getBankAccount() : null;
+        SettingService.BankAccount account = transferring ? settingService.getBankAccount(order.getBranchId()) : null;
         String qr = !transferring ? null
             : account != null ? Sepay.qrUrl(account, order.getTotalAmount(), order.getCode())
-            : settingService.getTransferQrUrl();
+            : settingService.getTransferQrUrl(order.getBranchId());
         List<OrderItemEntity> lines = orderItemRepository.findByOrderId(order.getId());
         Map<Integer, String> images = menuItemRepository.imagesOf(lines.stream().map(OrderItemEntity::getMenuItemId).toList());
         List<GuestOrderResponse.Item> items = lines.stream()

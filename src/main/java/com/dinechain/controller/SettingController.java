@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -57,20 +58,21 @@ public class SettingController {
     public record BankAccountSetting(String bank, String accountNumber, String accountName, boolean autoConfirm, String webhookPath) {
     }
 
-    @GetMapping("/bank-account")
+    @GetMapping("/branches/{branchId}/bank-account")
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Tài khoản nhận chuyển khoản", description = "Mỗi đơn mang về có mã QR riêng (số tiền + mã đơn). autoConfirm = đã đặt SEPAY_API_KEY")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<BankAccountSetting> getBankAccount() {
-        return ResponseEntity.ok(bankAccountSetting(settingService.getBankAccount()));
+    public ResponseEntity<BankAccountSetting> getBankAccount(@PathVariable Integer branchId) {
+        return ResponseEntity.ok(bankAccountSetting(settingService.getBankAccount(branchId)));
     }
 
-    @PutMapping("/bank-account")
+    @PutMapping("/branches/{branchId}/bank-account")
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Đổi tài khoản nhận chuyển khoản", description = "{\"bank\": \"MBBank\", \"accountNumber\": \"0123456789\", \"accountName\": \"...\"}; để trống cả hai = bỏ tài khoản")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<BankAccountSetting> updateBankAccount(@CurrentUser Integer staffId, @Valid @RequestBody BankAccountRequest request) {
-        return ResponseEntity.ok(bankAccountSetting(settingService.updateBankAccount(staffId,
+    public ResponseEntity<BankAccountSetting> updateBankAccount(@CurrentUser Integer staffId, @PathVariable Integer branchId,
+                                                                @Valid @RequestBody BankAccountRequest request) {
+        return ResponseEntity.ok(bankAccountSetting(settingService.updateBankAccount(staffId, branchId,
             new SettingService.BankAccount(request.bank(), request.accountNumber(), request.accountName()))));
     }
 
@@ -80,29 +82,30 @@ public class SettingController {
             : new BankAccountSetting(account.bank(), account.accountNumber(), account.accountName(), sepay.enabled(), WEBHOOK_PATH);
     }
 
-    @GetMapping("/transfer-qr")
+    @GetMapping("/branches/{branchId}/transfer-qr")
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Link ảnh mã QR chuyển khoản", description = "Khách đặt mang về chọn chuyển khoản sẽ thấy ảnh này")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<TransferQrSetting> getTransferQr() {
-        return ResponseEntity.ok(new TransferQrSetting(settingService.getTransferQrUrl()));
+    public ResponseEntity<TransferQrSetting> getTransferQr(@PathVariable Integer branchId) {
+        return ResponseEntity.ok(new TransferQrSetting(settingService.getTransferQrUrl(branchId)));
     }
 
-    @PutMapping("/transfer-qr")
+    @PutMapping("/branches/{branchId}/transfer-qr")
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Đổi link ảnh mã QR chuyển khoản", description = "{\"url\": \"https://...png\"}; để trống = tắt chuyển khoản")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<TransferQrSetting> updateTransferQr(@CurrentUser Integer staffId, @Valid @RequestBody TransferQrSetting request) {
-        return ResponseEntity.ok(new TransferQrSetting(settingService.updateTransferQrUrl(staffId, request.url())));
+    public ResponseEntity<TransferQrSetting> updateTransferQr(@CurrentUser Integer staffId, @PathVariable Integer branchId,
+                                                              @Valid @RequestBody TransferQrSetting request) {
+        return ResponseEntity.ok(new TransferQrSetting(settingService.updateTransferQrUrl(staffId, branchId, request.url())));
     }
 
-    @PutMapping(value = "/transfer-qr/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping(value = "/branches/{branchId}/transfer-qr/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Tải ảnh mã QR chuyển khoản lên", description = "Form-data field \"file\": ảnh PNG, JPEG hoặc WebP, tối đa 2MB. Thay link QR bằng ảnh vừa tải")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<TransferQrSetting> uploadTransferQr(@CurrentUser Integer staffId,
+    public ResponseEntity<TransferQrSetting> uploadTransferQr(@CurrentUser Integer staffId, @PathVariable Integer branchId,
                                                               @RequestParam("file") MultipartFile file) throws IOException {
-        return ResponseEntity.ok(new TransferQrSetting(settingService.uploadTransferQr(staffId, file.getContentType(), file.getBytes())));
+        return ResponseEntity.ok(new TransferQrSetting(settingService.uploadTransferQr(staffId, branchId, file.getContentType(), file.getBytes())));
     }
 
     @GetMapping("/vat")

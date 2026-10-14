@@ -2,7 +2,6 @@ package com.dinechain.controller;
 
 import com.dinechain.payment.Sepay;
 import com.dinechain.service.PaymentService;
-import com.dinechain.service.SettingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,6 @@ public class SepayWebhookController {
 
     private final Sepay sepay;
     private final PaymentService paymentService;
-    private final SettingService settingService;
 
     // The fields of SePay's webhook body this endpoint reads; the others are ignored
     public record SepayTransaction(Long id, String gateway, String accountNumber, String subAccount, String content,
@@ -51,21 +49,13 @@ public class SepayWebhookController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         String order = null;
-        if ("in".equalsIgnoreCase(tx.transferType()) && toOurAccount(tx)) {
+        if ("in".equalsIgnoreCase(tx.transferType())) {
             String reference = ("SEPAY-" + tx.id() + (tx.referenceCode() != null ? " " + tx.referenceCode() : ""));
             order = paymentService.confirmBankTransfer(tx.content(), tx.transferAmount(),
-                reference.length() > 100 ? reference.substring(0, 100) : reference);
+                reference.length() > 100 ? reference.substring(0, 100) : reference, tx.accountNumber(), tx.subAccount());
         }
         // Always answer success once the call is genuine: SePay retries otherwise, and a retry would not match either
         return ResponseEntity.ok(order != null ? Map.of("success", true, "order", order) : Map.of("success", true));
     }
 
-    // One SePay account can watch several bank accounts: only money into the chain's account pays orders
-    private boolean toOurAccount(SepayTransaction tx) {
-        SettingService.BankAccount account = settingService.getBankAccount();
-        if (account == null || tx.accountNumber() == null) {
-            return true;
-        }
-        return account.accountNumber().equals(tx.accountNumber()) || account.accountNumber().equals(tx.subAccount());
-    }
 }

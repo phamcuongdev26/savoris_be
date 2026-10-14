@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Starting point of an empty database: the 9 branches of the chain (CN01–CN09, renamed later from the owner
+ * Starting point of an empty database: the 4 branches of the chain (CN01–CN04, renamed later from the owner
  * screen) and one login per role so the first people can sign in. No menu, tables, stock, customers or
  * promotions are created: that is real data the chain enters itself.
  *
@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "dinechain.bootstrap.enabled", havingValue = "true", matchIfMissing = true)
 public class BootstrapDataSeeder implements ApplicationRunner {
 
-    private static final int BRANCHES = 9;
+    private static final int BRANCHES = 4;
 
     private final BranchRepository branchRepository;
     private final StaffRepository staffRepository;

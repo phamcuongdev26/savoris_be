@@ -291,7 +291,7 @@ public class OrderServiceImpl implements OrderService {
         if (request.payMethod() != PaymentMethod.CASH && request.payMethod() != PaymentMethod.BANK_TRANSFER) {
             throw new AppException(ErrorCode.PAYMENT_METHOD_NOT_SUPPORTED);
         }
-        if (request.payMethod() == PaymentMethod.BANK_TRANSFER && !settingService.transferAvailable()) {
+        if (request.payMethod() == PaymentMethod.BANK_TRANSFER && !settingService.transferAvailable(branch.getId())) {
             throw new AppException(ErrorCode.PAYMENT_METHOD_NOT_SUPPORTED, "Bank transfer is not set up yet: pay cash at the counter");
         }
         checkKitchenAcceptsTakeaway(branch);

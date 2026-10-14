@@ -32,10 +32,10 @@ public class GuestTakeawayController {
     private final GuestTakeawayService guestTakeawayService;
     private final SettingService settingService;
 
-    @GetMapping("/images/transfer-qr")
+    @GetMapping("/images/transfer-qr/{branchId}")
     @Operation(summary = "Ảnh mã QR chuyển khoản", description = "Ảnh chủ chuỗi đã tải lên; 404 khi chưa có")
-    public ResponseEntity<byte[]> getTransferQrImage() {
-        return settingService.getTransferQrImage()
+    public ResponseEntity<byte[]> getTransferQrImage(@PathVariable Integer branchId) {
+        return settingService.getTransferQrImage(branchId)
             .map(image -> ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.getContentType()))
                 // The link carries a version (?v=…), so the image under one link never changes

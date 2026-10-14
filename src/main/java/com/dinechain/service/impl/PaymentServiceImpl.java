@@ -15,6 +15,7 @@ import com.dinechain.repository.OrderItemRepository;
 import com.dinechain.repository.OrderRepository;
 import com.dinechain.repository.PaymentRepository;
 import com.dinechain.security.BranchAccessGuard;
+import com.dinechain.service.SettingService;
 import com.dinechain.service.LoyaltyService;
 import com.dinechain.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final LoyaltyService loyaltyService;
     private final OrderItemRepository orderItemRepository;
     private final TakeawayNotifier takeawayNotifier;
+    private final SettingService settingService;
 
     @Override
     @Transactional
@@ -91,7 +93,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public String confirmBankTransfer(String content, BigDecimal amount, String reference) {
+    public String confirmBankTransfer(String content, BigDecimal amount, String reference, String accountNumber, String subAccount) {
         for (String code : Sepay.orderCodesIn(content)) {
             Integer id = orderRepository.findByCode(code).map(OrderEntity::getId).orElse(null);
             if (id == null) {
@@ -100,6 +102,10 @@ public class PaymentServiceImpl implements PaymentService {
             // Same lock as the cashier and the expiry job: whoever comes second sees the order already settled
             OrderEntity order = orderRepository.findByIdForUpdate(id).orElseThrow();
             if (order.getPayMethod() != PaymentMethod.BANK_TRANSFER || order.getPublicToken() == null) {
+                continue;
+            }
+            if (!settingService.accountBelongsToBranch(order.getBranchId(), accountNumber, subAccount)) {
+                log.warn("Transfer {} referenced order {} but arrived on another branch account", reference, code);
                 continue;
             }
             if (order.getStatus() == OrderStatus.CANCELLED) {

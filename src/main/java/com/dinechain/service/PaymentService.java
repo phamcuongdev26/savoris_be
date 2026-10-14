@@ -12,5 +12,5 @@ public interface PaymentService {
     PaymentResponse refundPayment(Integer staffId, Integer paymentId);
     // A transfer the bank reported through SePay: pays the web takeaway order whose code is in the content.
     // Returns the paid order's code, or null when no unpaid transfer order matched
-    String confirmBankTransfer(String content, BigDecimal amount, String reference);
+    String confirmBankTransfer(String content, BigDecimal amount, String reference, String accountNumber, String subAccount);
 }
