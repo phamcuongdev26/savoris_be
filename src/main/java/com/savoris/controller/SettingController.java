@@ -38,6 +38,7 @@ public class SettingController {
     private final Sepay sepay;
 
     private static final String WEBHOOK_PATH = "/api/v1/public/sepay/webhook";
+    private static final int DEFAULT_BRANCH_ID = 1;
 
     public record VatSetting(@NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal percent) {
     }
@@ -56,6 +57,23 @@ public class SettingController {
 
     // autoConfirm: SEPAY_API_KEY is set; webhookPath: where to point SePay's webhook
     public record BankAccountSetting(String bank, String accountNumber, String accountName, boolean autoConfirm, String webhookPath) {
+    }
+
+    @GetMapping("/bank-account")
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Tài khoản nhận chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/bank-account cho từng chi nhánh")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<BankAccountSetting> getDefaultBankAccount() {
+        return getBankAccount(DEFAULT_BRANCH_ID);
+    }
+
+    @PutMapping("/bank-account")
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Đổi tài khoản nhận chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/bank-account cho từng chi nhánh")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<BankAccountSetting> updateDefaultBankAccount(@CurrentUser Integer staffId,
+                                                                       @Valid @RequestBody BankAccountRequest request) {
+        return updateBankAccount(staffId, DEFAULT_BRANCH_ID, request);
     }
 
     @GetMapping("/branches/{branchId}/bank-account")
@@ -80,6 +98,32 @@ public class SettingController {
         return account == null
             ? new BankAccountSetting(null, null, null, sepay.enabled(), WEBHOOK_PATH)
             : new BankAccountSetting(account.bank(), account.accountNumber(), account.accountName(), sepay.enabled(), WEBHOOK_PATH);
+    }
+
+    @GetMapping("/transfer-qr")
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Link ảnh mã QR chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/transfer-qr cho từng chi nhánh")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<TransferQrSetting> getDefaultTransferQr() {
+        return getTransferQr(DEFAULT_BRANCH_ID);
+    }
+
+    @PutMapping("/transfer-qr")
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Đổi link ảnh mã QR chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/transfer-qr cho từng chi nhánh")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<TransferQrSetting> updateDefaultTransferQr(@CurrentUser Integer staffId,
+                                                                     @Valid @RequestBody TransferQrSetting request) {
+        return updateTransferQr(staffId, DEFAULT_BRANCH_ID, request);
+    }
+
+    @PutMapping(value = "/transfer-qr/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Tải ảnh mã QR chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/transfer-qr/image cho từng chi nhánh")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<TransferQrSetting> uploadDefaultTransferQr(@CurrentUser Integer staffId,
+                                                                     @RequestParam("file") MultipartFile file) throws IOException {
+        return uploadTransferQr(staffId, DEFAULT_BRANCH_ID, file);
     }
 
     @GetMapping("/branches/{branchId}/transfer-qr")
