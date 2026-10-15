@@ -152,11 +152,11 @@ class SepayWebhookTest extends IntegrationTestSupport {
 
     @Test
     void ownerSeesWhetherAutoConfirmIsOn() throws Exception {
-        mockMvc.perform(get("/settings/bank-account").with(as(admin)))
+        mockMvc.perform(get("/settings/branches/" + branch.getId() + "/bank-account").with(as(admin)))
             .andExpect(jsonPath("$.bank").value("MBBank"))
             .andExpect(jsonPath("$.autoConfirm").value(true))
             .andExpect(jsonPath("$.webhookPath").value("/api/v1/public/sepay/webhook"));
-        mockMvc.perform(put("/settings/bank-account").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/settings/branches/" + branch.getId() + "/bank-account").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"bank\":\"MBBank\",\"accountNumber\":\"\"}"))
             .andExpect(status().isBadRequest());
     }
@@ -179,7 +179,7 @@ class SepayWebhookTest extends IntegrationTestSupport {
     }
 
     private void setBankAccount(String bank, String number) throws Exception {
-        mockMvc.perform(put("/settings/bank-account").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/settings/branches/" + branch.getId() + "/bank-account").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"bank\":\"" + bank + "\",\"accountNumber\":\"" + number + "\",\"accountName\":\"SAVORIS\"}"))
             .andExpect(status().isOk());
     }

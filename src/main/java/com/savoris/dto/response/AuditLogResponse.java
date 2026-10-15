@@ -28,8 +28,8 @@ public class AuditLogResponse {
             .action(e.getAction())
             .entityType(e.getEntityType())
             .entityId(e.getEntityId())
-            .oldValue(e.getOldValue())
-            .newValue(e.getNewValue())
+            .oldValue(e.getOldValue() != null ? e.getOldValue().toString() : null)
+            .newValue(e.getNewValue() != null ? e.getNewValue().toString() : null)
             .createdAt(e.getCreatedAt())
             .build();
     }

@@ -2,9 +2,11 @@ package com.savoris;
 
 import com.savoris.constant.StaffRole;
 import com.savoris.constant.StaffStatus;
+import com.savoris.entity.AuditLogEntity;
 import com.savoris.entity.BranchEntity;
 import com.savoris.entity.MenuItemEntity;
 import com.savoris.entity.StaffEntity;
+import com.savoris.repository.AuditLogRepository;
 import com.savoris.security.jwt.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,17 +14,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SecurityRulesTest extends IntegrationTestSupport {
 
     @Autowired JwtService jwtService;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired AuditLogRepository auditLogRepository;
 
     private BranchEntity branch;
     private StaffEntity owner;
@@ -107,6 +113,49 @@ class SecurityRulesTest extends IntegrationTestSupport {
     }
 
     @Test
+    void warehouseCanManageStockOnlyAtTheirOwnBranch() throws Exception {
+        BranchEntity otherBranch = createBranch(null);
+
+        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(warehouse)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(warehouse)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/inventory/branch/" + branch.getId() + "/import").with(as(warehouse))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rows\":[{\"name\":\"Rice\",\"unit\":\"kg\",\"quantity\":10,\"minStock\":2}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.created").value(1));
+        mockMvc.perform(post("/inventory/branch/" + otherBranch.getId() + "/import").with(as(warehouse))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rows\":[{\"name\":\"Beef\",\"unit\":\"kg\",\"quantity\":10}]}"))
+            .andExpect(status().isForbidden());
+
+        // ADMIN retains the existing all-branch stock access.
+        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(owner)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void staffCreationIsWrittenToTheAuditLog() throws Exception {
+        String body = staffJson("WAITER", branch);
+        String username = body.replaceAll(".*\"username\":\"([^\"]+)\".*", "$1");
+        mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated());
+
+        List<AuditLogEntity> logs = List.of();
+        for (int attempt = 0; attempt < 30; attempt++) {
+            logs = auditLogRepository.findAll().stream()
+                .filter(log -> log.getNewValue() != null
+                    && username.equals(log.getNewValue().path("username").asText()))
+                .toList();
+            if (!logs.isEmpty()) break;
+            Thread.sleep(50);
+        }
+        assertTrue(!logs.isEmpty(), "Staff creation should be persisted in the audit log");
+        assertTrue(logs.get(0).getNewValue().path("role").asText().equals("WAITER"));
+    }
+
+    @Test
     void newStaffLogInWithThePasswordTheirManagerSet_notAHardCodedDefault() throws Exception {
         String body = staffJson("CHEF", branch);
         String username = body.replaceAll(".*\"username\":\"([^\"]+)\".*", "$1");
@@ -125,7 +174,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
     void managerCannotPromoteStaff() throws Exception {
         StaffEntity cashier = createStaff(StaffRole.WAITER, branch);
         String promote = "{\"fullName\":\"X\",\"email\":\"x" + unique() + "@savoris.vn\",\"phone\":\"0900000000\","
-            + "\"role\":\"BRANCH_MANAGER\",\"hourlyRate\":1}";
+            + "\"role\":\"BRANCH_MANAGER\",\"branchId\":" + branch.getId() + ",\"hourlyRate\":1}";
         mockMvc.perform(put("/staff/" + cashier.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(promote))
             .andExpect(status().isForbidden());
         // ...and cannot touch the owner's account

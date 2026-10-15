@@ -1,5 +1,8 @@
 package com.savoris.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.savoris.entity.AuditLogEntity;
 import com.savoris.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class AuditLogger {
 
     private final AuditLogRepository repo;
+    private final ObjectMapper objectMapper;
 
     @Async
     public void log(Integer staffId, Integer branchId,
@@ -26,9 +30,18 @@ public class AuditLogger {
             .action(action)
             .entityType(entityType)
             .entityId(entityId)
-            .oldValue(oldValue)
-            .newValue(newValue)
+            .oldValue(parse(oldValue))
+            .newValue(parse(newValue))
             .build();
         repo.save(entry);
+    }
+
+    private JsonNode parse(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return objectMapper.readTree(value);
+        } catch (JsonProcessingException e) {
+            return objectMapper.getNodeFactory().textNode(value);
+        }
     }
 }

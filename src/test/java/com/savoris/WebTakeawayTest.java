@@ -149,28 +149,28 @@ class WebTakeawayTest extends IntegrationTestSupport {
     @Test
     void ownerUploadsTheQrImageAndGuestsSeeIt() throws Exception {
         byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 'I', 'H', 'D', 'R'};
-        String saved = mockMvc.perform(multipart(HttpMethod.PUT, "/settings/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", png)).with(as(admin)))
+        String saved = mockMvc.perform(multipart(HttpMethod.PUT, "/settings/branches/" + branch.getId() + "/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", png)).with(as(admin)))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
         String url = JsonPath.read(saved, "$.url");
-        org.assertj.core.api.Assertions.assertThat(url).startsWith("/api/v1/public/images/transfer-qr?v=");
+        org.assertj.core.api.Assertions.assertThat(url).startsWith("/api/v1/public/images/transfer-qr/" + branch.getId() + "?v=");
 
         // Guests get the bytes without logging in, and a transfer order shows that link
-        mockMvc.perform(get("/public/images/transfer-qr"))
+        mockMvc.perform(get("/public/images/transfer-qr/" + branch.getId()))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", "image/png"))
             .andExpect(content().bytes(png));
         order("BANK_TRANSFER").andExpect(status().isCreated()).andExpect(jsonPath("$.transferQrUrl").value(url));
 
         // Saving the settings form unchanged keeps the uploaded image
-        mockMvc.perform(put("/settings/transfer-qr").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/settings/branches/" + branch.getId() + "/transfer-qr").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"url\":\"" + url + "\"}"))
             .andExpect(status().isOk());
 
         // Anything that is not really an image is refused, whatever its name; staff other than the owner cannot upload
-        mockMvc.perform(multipart(HttpMethod.PUT, "/settings/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", "<svg/>".getBytes())).with(as(admin)))
+        mockMvc.perform(multipart(HttpMethod.PUT, "/settings/branches/" + branch.getId() + "/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", "<svg/>".getBytes())).with(as(admin)))
             .andExpect(status().isBadRequest());
-        mockMvc.perform(multipart(HttpMethod.PUT, "/settings/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", png)).with(as(cashier)))
+        mockMvc.perform(multipart(HttpMethod.PUT, "/settings/branches/" + branch.getId() + "/transfer-qr/image").file(new MockMultipartFile("file", "qr.png", "image/png", png)).with(as(cashier)))
             .andExpect(status().isForbidden());
     }
 
@@ -216,7 +216,7 @@ class WebTakeawayTest extends IntegrationTestSupport {
     }
 
     private void setTransferQr(String url) throws Exception {
-        mockMvc.perform(put("/settings/transfer-qr").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/settings/branches/" + branch.getId() + "/transfer-qr").with(as(admin)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"url\":\"" + url + "\"}"))
             .andExpect(status().isOk());
     }

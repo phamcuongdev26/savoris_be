@@ -20,9 +20,9 @@ public final class Roles {
     public static final String SERVICE = RESTAURANT;
     // Cooks and owner may move dishes through the kitchen flow
     public static final String KITCHEN = "hasAnyRole('ADMIN','CHEF')";
-    // Stock count/import belongs to admin and branch manager in the restaurant router
-    public static final String STOCK = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
-    public static final String STOCK_READ = "hasAnyRole('ADMIN','BRANCH_MANAGER')";
+    // Warehouse staff handle stock at their own branch; branch scope is enforced in services.
+    public static final String STOCK = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAREHOUSE')";
+    public static final String STOCK_READ = "hasAnyRole('ADMIN','BRANCH_MANAGER','WAREHOUSE')";
 
     private Roles() {
     }

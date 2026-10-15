@@ -3,6 +3,9 @@ package com.savoris.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.LocalDateTime;
 
@@ -36,11 +39,13 @@ public class AuditLogEntity {
     @Column(name = "entity_id", nullable = false)
     private Integer entityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value", columnDefinition = "JSON")
-    private String oldValue;
+    private JsonNode oldValue;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value", columnDefinition = "JSON")
-    private String newValue;
+    private JsonNode newValue;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
