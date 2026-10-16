@@ -59,7 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
     "logging.level.com.dinechain=WARN",
     "logging.level.org.springframework.security=WARN",
     "dinechain.demo-data.enabled=false",
-    "spring.datasource.url=jdbc:postgresql://localhost:5432/dinechain?currentSchema=loadtest",
+    "spring.datasource.url=jdbc:postgresql://localhost:5432/savoris?currentSchema=loadtest",
     "spring.flyway.schemas=loadtest",
     "spring.flyway.clean-disabled=false"
 })

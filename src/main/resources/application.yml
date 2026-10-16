@@ -8,9 +8,9 @@ spring:
   application:
     name: DineChain
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/dinechain}
-    username: ${DB_USERNAME:dinechain}
-    password: ${DB_PASSWORD:dinechain123}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/savoris}
+    username: ${DB_USERNAME:savoris}
+    password: ${DB_PASSWORD:savoris123}
     driver-class-name: org.postgresql.Driver
   jpa:
     # Release the DB connection as soon as the service is done, not after the JSON is written (measured: ~3x throughput at peak)

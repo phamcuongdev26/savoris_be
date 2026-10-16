@@ -1,10 +1,10 @@
-# Tests run on the real PostgreSQL, in their own schema "dinechain_test": the schema is wiped and rebuilt by the
+# Tests run on the real PostgreSQL, in their own schema "savoris_test": the schema is wiped and rebuilt by the
 # Flyway migrations at the start of each test run, and the application's own data (schema "public") is never touched.
 spring:
   datasource:
-    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/dinechain?currentSchema=dinechain_test}
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/savoris?currentSchema=savoris_test}
   flyway:
-    schemas: dinechain_test
+    schemas: savoris_test
     clean-disabled: false
 
 logging:
