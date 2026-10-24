@@ -161,9 +161,13 @@ public class SiteController {
     @GetMapping("/gallery")
     @Operation(summary = "Lấy cấu hình gallery")
     public ResponseEntity<Object> getGallery() {
-        // Prefer gallery_image table (managed by new CMS); fall back to site_config
+        // The legacy Website CMS is the chain-level source. Do not mix in branch galleries.
+        ResponseEntity<Object> configured = getConfig("gallery");
+        if (configured.getBody() != null) return configured;
+
+        // New CMS entries for the whole chain have a NULL branch_id.
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, image_url, alt, sort_order FROM gallery_image WHERE visible=true ORDER BY sort_order, id");
+            "SELECT id, image_url, alt, sort_order FROM gallery_image WHERE branch_id IS NULL AND visible=true ORDER BY sort_order, id");
         if (!rows.isEmpty()) {
             List<Map<String, Object>> items = new ArrayList<>();
             for (Map<String, Object> r : rows) {
@@ -177,7 +181,7 @@ public class SiteController {
             }
             return ResponseEntity.ok(items);
         }
-        return getConfig("gallery");
+        return ResponseEntity.ok(List.of());
     }
 
     @PutMapping("/gallery")
