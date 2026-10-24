@@ -150,8 +150,8 @@ public class WebsiteCmsController {
             sql = id == null ? "insert into testimonial(branch_id,quote,reviewer,title,sort_order,visible) values(?,?,?,?,?,?) returning id" : "update testimonial set branch_id=?,quote=?,reviewer=?,title=?,sort_order=?,visible=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), p.get("quote"), p.get("reviewer"), p.getOrDefault("title", ""), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else if ("menu_file".equals(table)) {
-            sql = id == null ? "insert into menu_file(branch_id,title,file_url,sort_order,visible) values(?,?,?,?,?) returning id" : "update menu_file set branch_id=?,title=?,file_url=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("title"), pick(p, "fileUrl", "file_url"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
+            sql = id == null ? "insert into menu_file(branch_id,title,file_url,image_url,sort_order,visible) values(?,?,?,?,?,?) returning id" : "update menu_file set branch_id=?,title=?,file_url=?,image_url=?,sort_order=?,visible=? where id=? returning id";
+            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("title"), pick(p, "fileUrl", "file_url"), pick(p, "imageUrl", "image_url"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else {
             sql = id == null ? "insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,?,?,?) returning id" : "update opening_hour set branch_id=?,weekday=?,opens_at=?,closes_at=?,closed=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), p.get("weekday"), pick(p, "opensAt", "opens_at"), pick(p, "closesAt", "closes_at"), p.getOrDefault("closed", false)};
