@@ -45,6 +45,11 @@ public class SiteController {
         }
     }
 
+    private ResponseEntity<Object> getConfigList(String key) {
+        ResponseEntity<Object> response = getConfig(key);
+        return response.getBody() == null ? ResponseEntity.ok(List.of()) : response;
+    }
+
     private ResponseEntity<Object> putConfig(String key, Object body, Integer staffId) {
         try {
             String json = objectMapper.writeValueAsString(body);
@@ -99,7 +104,7 @@ public class SiteController {
     @GetMapping("/sections")
     @Operation(summary = "Lấy cấu hình sections")
     public ResponseEntity<Object> getSections() {
-        return getConfig("sections");
+        return getConfigList("sections");
     }
 
     @PutMapping("/sections")
@@ -115,7 +120,7 @@ public class SiteController {
     @GetMapping("/milestones")
     @Operation(summary = "Lấy cấu hình milestones")
     public ResponseEntity<Object> getMilestones() {
-        return getConfig("milestones");
+        return getConfigList("milestones");
     }
 
     @PutMapping("/milestones")
@@ -195,7 +200,7 @@ public class SiteController {
     @GetMapping("/nav")
     @Operation(summary = "Lấy cấu hình nav")
     public ResponseEntity<Object> getNav() {
-        return getConfig("nav");
+        return getConfigList("nav");
     }
 
     @PutMapping("/nav")
