@@ -83,7 +83,7 @@ public class BranchController {
         @ApiResponse(responseCode = "401", description = "Chưa xác thực",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     public ResponseEntity<BranchResponse> updateBranch(
         @CurrentUser Integer staffId,
         @PathVariable Integer branchId,

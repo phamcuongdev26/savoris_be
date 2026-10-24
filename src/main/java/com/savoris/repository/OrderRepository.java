@@ -42,6 +42,12 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
         + "where o.status = com.savoris.constant.OrderStatus.COMPLETED and o.closedAt >= :since group by o.branchId")
     List<Object[]> countCompletedSinceGroupByBranch(@Param("since") LocalDateTime since);
 
+    long countByBranchIdAndStatus(Integer branchId, OrderStatus status);
+
+    @Query("select count(o) from OrderEntity o "
+        + "where o.branchId = :branchId and o.status = com.savoris.constant.OrderStatus.COMPLETED and o.closedAt >= :since")
+    long countCompletedSinceForBranch(@Param("branchId") Integer branchId, @Param("since") LocalDateTime since);
+
     // Locks the order row so pay / complete / cancel on the same order run one after another
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from OrderEntity o where o.id = :id")

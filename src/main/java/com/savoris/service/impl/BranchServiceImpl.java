@@ -70,9 +70,9 @@ public class BranchServiceImpl implements BranchService {
     @Override
     @Transactional
     public BranchResponse updateBranch(Integer staffId, Integer branchId, UpdateBranchRequest request) {
-        if (branchAccessGuard.check(staffId, branchId).getRole() != com.savoris.constant.StaffRole.ADMIN) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Chỉ ADMIN được sửa thông tin chi nhánh");
-        }
+        var caller = branchAccessGuard.check(staffId, branchId);
+        boolean isAdmin = caller.getRole() == com.savoris.constant.StaffRole.ADMIN;
+
         BranchEntity branch = branchRepository.findById(branchId)
             .orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND, "Branch not found: " + branchId));
 
@@ -85,8 +85,11 @@ public class BranchServiceImpl implements BranchService {
         branch.setLongitude(request.getLongitude());
         branch.setOpenTime(request.getOpenTime());
         branch.setCloseTime(request.getCloseTime());
-        branch.setManagerId(request.getManagerId());
-        branch.setKitchenCapacity(request.getKitchenCapacity());
+        // Only ADMIN can reassign the manager or change kitchen capacity
+        if (isAdmin) {
+            branch.setManagerId(request.getManagerId());
+            branch.setKitchenCapacity(request.getKitchenCapacity());
+        }
         branch.setUpdatedAt(LocalDateTime.now());
 
         BranchEntity updated = branchRepository.save(branch);

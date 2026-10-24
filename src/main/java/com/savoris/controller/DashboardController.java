@@ -1,6 +1,9 @@
 package com.savoris.controller;
 
+import com.savoris.dto.response.BranchDashboardResponse;
 import com.savoris.dto.response.ChainDashboardResponse;
+import com.savoris.security.CurrentUser;
+import com.savoris.security.Roles;
 import com.savoris.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -9,22 +12,33 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/dashboard")
 @RequiredArgsConstructor
-@Tag(name = "Dashboard", description = "Chain-wide overview for the owner")
+@Tag(name = "Dashboard", description = "Tổng quan vận hành")
 public class DashboardController {
 
     private final DashboardService dashboardService;
 
     @GetMapping("/chain")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Tổng quan toàn chuỗi", description = "Đơn đang mở, doanh thu hôm nay và tải bếp của từng chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ChainDashboardResponse> getChainDashboard() {
         return ResponseEntity.ok(dashboardService.getChainDashboard());
+    }
+
+    @GetMapping("/branch/{branchId}")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Operation(summary = "Tổng quan chi nhánh", description = "Đơn đang mở, doanh thu, đặt bàn và tải bếp của chi nhánh hôm nay")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<BranchDashboardResponse> getBranchDashboard(
+            @PathVariable Integer branchId,
+            @CurrentUser Integer staffId) {
+        return ResponseEntity.ok(dashboardService.getBranchDashboard(staffId, branchId));
     }
 }
