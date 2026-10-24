@@ -49,6 +49,9 @@ public class DashboardServiceImpl implements DashboardService {
         for (Object[] row : orderRepository.countByStatusGroupByBranch(OrderStatus.OPEN)) {
             openOrders.put((Integer) row[0], ((Number) row[1]).longValue());
         }
+        for (Object[] row : orderRepository.countByStatusGroupByBranch(OrderStatus.AWAITING_PAYMENT)) {
+            openOrders.merge((Integer) row[0], ((Number) row[1]).longValue(), Long::sum);
+        }
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         Map<Integer, Long> completedToday = new HashMap<>();
         for (Object[] row : orderRepository.countCompletedSinceGroupByBranch(startOfDay)) {
@@ -92,7 +95,8 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
 
-        long openOrders = orderRepository.countByBranchIdAndStatus(branchId, OrderStatus.OPEN);
+        long openOrders = orderRepository.countByBranchIdAndStatus(branchId, OrderStatus.OPEN)
+            + orderRepository.countByBranchIdAndStatus(branchId, OrderStatus.AWAITING_PAYMENT);
         long completedToday = orderRepository.countCompletedSinceForBranch(branchId, startOfDay);
         BigDecimal revenueToday = paymentRepository.sumPaidSinceForBranch(branchId, startOfDay);
         long reservationsToday = reservationRepository

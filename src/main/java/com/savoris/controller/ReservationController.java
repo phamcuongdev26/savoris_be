@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -60,11 +61,27 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.cancelReservation(staffId, reservationId));
     }
 
+    @PutMapping("/{reservationId}/no-show")
+    @Operation(summary = "Đánh dấu khách không đến")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.FRONT_OF_HOUSE)
+    public ResponseEntity<ReservationResponse> markNoShow(@CurrentUser Integer staffId, @PathVariable Integer reservationId) {
+        return ResponseEntity.ok(reservationService.markNoShow(staffId, reservationId));
+    }
+
     @GetMapping("/branch/{branchId}")
     @Operation(summary = "Danh sách đặt bàn theo chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<List<ReservationResponse>> getByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
-        return ResponseEntity.ok(reservationService.getReservationsByBranch(staffId, branchId));
+    public ResponseEntity<List<ReservationResponse>> getByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) com.savoris.constant.ReservationStatus status) {
+        LocalDate selectedDate = date == null ? LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")) : date;
+        LocalDateTime start = selectedDate.atStartOfDay();
+        LocalDateTime end = selectedDate.plusDays(1).atStartOfDay();
+        return ResponseEntity.ok(reservationService.getReservationsByBranch(staffId, branchId).stream()
+            .filter(r -> r.getReservationDate() != null && !r.getReservationDate().isBefore(start) && r.getReservationDate().isBefore(end))
+            .filter(r -> status == null || r.getStatus() == status)
+            .toList());
     }
 
     @GetMapping("/customer/{customerId}")

@@ -44,6 +44,10 @@ public class MenuItemEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Builder.Default
+    @Column(name = "takeaway_available", nullable = false)
+    private Boolean takeawayAvailable = true;
+
     // false = drink or ready-made dish: served straight away, never shown to the kitchen
     @Builder.Default
     @Column(name = "needs_kitchen", nullable = false)

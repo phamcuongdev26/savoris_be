@@ -19,7 +19,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, Inte
     List<OrderItemEntity> findByOrderIdIn(Collection<Integer> orderIds);
 
     @Query("select i from OrderItemEntity i join OrderEntity o on o.id = i.orderId "
-        + "where o.branchId = :branchId and i.status in :statuses and o.status <> com.savoris.constant.OrderStatus.AWAITING_PAYMENT"
+        + "where o.branchId = :branchId and i.status in :statuses"
         + " and i.needsKitchen = true order by i.orderedAt, i.id")
     List<OrderItemEntity> findKitchenQueue(@Param("branchId") Integer branchId,
                                            @Param("statuses") Collection<OrderItemStatus> statuses);

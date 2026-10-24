@@ -19,10 +19,12 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/site")
@@ -46,6 +48,51 @@ public class SiteController {
             return ResponseEntity.ok(parsed);
         } catch (JsonProcessingException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse stored config: " + key);
+        }
+    }
+
+    private ResponseEntity<Object> getConfigList(String key) {
+        ResponseEntity<Object> response = getConfig(key);
+        return response.getBody() == null ? ResponseEntity.ok(List.of()) : response;
+    }
+
+    private List<?> uniqueGalleryItems(Object value) {
+        if (!(value instanceof List<?> items)) return List.of();
+        Set<String> seen = new HashSet<>();
+        List<Object> unique = new ArrayList<>();
+        for (Object item : items) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            Object rawUrl = map.get("image_url");
+            if (!(rawUrl instanceof String url) || url.isBlank()) continue;
+            if (seen.add(canonicalGalleryKey(url))) unique.add(item);
+        }
+        return unique;
+    }
+
+    private String canonicalGalleryKey(String value) {
+        try {
+            java.net.URI uri = java.net.URI.create(value.trim());
+            String host = Optional.ofNullable(uri.getHost()).orElse("").toLowerCase();
+            String path = Optional.ofNullable(uri.getPath()).orElse("");
+            String marker = "/image/upload/";
+            int uploadAt = path.indexOf(marker);
+            if (uploadAt < 0) return host + path;
+
+            String tail = path.substring(uploadAt + marker.length());
+            java.util.regex.Matcher version = java.util.regex.Pattern.compile("(?:^|/)(v\\d+/.*)$").matcher(tail);
+            if (version.find()) tail = version.group(1);
+            else {
+                int firstSlash = tail.indexOf('/');
+                if (firstSlash > 0) {
+                    String first = tail.substring(0, firstSlash);
+                    if (first.contains(",") || first.matches("(?i)(?:a|b|c|dpr|e|f|fl|g|h|l|o|q|r|t|w|x|y|z|ar|br|co|cs|dl|dn|du|eo|ki|sp|so|u)_[^/]+")) {
+                        tail = tail.substring(firstSlash + 1);
+                    }
+                }
+            }
+            return host + marker + tail;
+        } catch (IllegalArgumentException ignored) {
+            return value.trim().split("[?#]", 2)[0];
         }
     }
 
@@ -142,7 +189,7 @@ public class SiteController {
     @GetMapping("/sections")
     @Operation(summary = "Lấy cấu hình sections")
     public ResponseEntity<Object> getSections() {
-        return getConfig("sections");
+        return getConfigList("sections");
     }
 
     @PutMapping("/sections")
@@ -158,7 +205,7 @@ public class SiteController {
     @GetMapping("/milestones")
     @Operation(summary = "Lấy cấu hình milestones")
     public ResponseEntity<Object> getMilestones() {
-        return getConfig("milestones");
+        return getConfigList("milestones");
     }
 
     @PutMapping("/milestones")
@@ -176,7 +223,9 @@ public class SiteController {
     public ResponseEntity<Object> getGallery() {
         // The legacy Website CMS is the chain-level source. Do not mix in branch galleries.
         ResponseEntity<Object> configured = getConfig("gallery");
-        if (configured.getBody() != null) return configured;
+        if (configured.getBody() != null) {
+            return ResponseEntity.ok(uniqueGalleryItems(configured.getBody()));
+        }
 
         // New CMS entries for the whole chain have a NULL branch_id.
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -192,7 +241,7 @@ public class SiteController {
                 item.put("order", r.get("sort_order"));
                 items.add(item);
             }
-            return ResponseEntity.ok(items);
+            return ResponseEntity.ok(uniqueGalleryItems(items));
         }
         return ResponseEntity.ok(List.of());
     }
@@ -258,7 +307,7 @@ public class SiteController {
     @GetMapping("/nav")
     @Operation(summary = "Lấy cấu hình nav")
     public ResponseEntity<Object> getNav() {
-        return getConfig("nav");
+        return getConfigList("nav");
     }
 
     @PutMapping("/nav")

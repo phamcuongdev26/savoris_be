@@ -4,6 +4,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
+import com.savoris.constant.StaffRole;
+import com.savoris.entity.StaffEntity;
+import com.savoris.security.BranchAccessGuard;
+import com.savoris.security.CurrentUser;
 import com.savoris.security.Roles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +23,7 @@ import java.util.*;
 public class WebsiteCmsController {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final BranchAccessGuard branchAccess;
 
     private static final Map<String, String> TABLES = Map.of(
         "offers", "offer", "gallery", "gallery_image", "accolades", "accolade",
@@ -32,6 +37,9 @@ public class WebsiteCmsController {
         result.put("branches", jdbc.queryForList("select id, code, name, slug, address, city, phone, email, latitude, longitude from branches where status='ACTIVE' order by id"));
         result.put("gallery", publicRows("gallery_image", null));
         result.put("offers", publicRows("offer", null));
+        result.put("accolades", publicRows("accolade", null));
+        result.put("testimonials", publicRows("testimonial", null));
+        result.put("menus", publicRows("menu_file", null));
         return result;
     }
 
@@ -59,13 +67,19 @@ public class WebsiteCmsController {
     }
 
     @GetMapping("/admin/website")
-    @PreAuthorize(Roles.ADMIN)
-    public Map<String, Object> adminWebsite() {
+    @PreAuthorize(Roles.MANAGEMENT)
+    public Map<String, Object> adminWebsite(@CurrentUser Integer staffId) {
+        StaffEntity staff = branchAccess.currentUser(staffId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("settings", singleton("site_setting"));
-        result.put("branches", jdbc.queryForList("select id, code, name, slug from branches where status='ACTIVE' order by id"));
-        for (String resource : TABLES.keySet()) result.put(resource, visibleRows(TABLES.get(resource), null));
-        result.put("branchPages", jdbc.query("select branch_id, payload::text as payload from branch_page", (rs, n) -> Map.of("branchId", rs.getInt("branch_id"), "payload", jsonMap(rs.getString("payload")))));
+        Integer branchId = staff.getRole() == StaffRole.MANAGER ? staff.getBranchId() : null;
+        if (staff.getRole() == StaffRole.ADMIN) result.put("settings", singleton("site_setting"));
+        String branchesSql = "select id, code, name, slug from branches where status='ACTIVE'" + (branchId == null ? "" : " and id=?") + " order by id";
+        result.put("branches", branchId == null ? jdbc.queryForList(branchesSql) : jdbc.queryForList(branchesSql, branchId));
+        for (String resource : TABLES.keySet()) result.put(resource, visibleRows(TABLES.get(resource), branchId));
+        String pagesSql = "select branch_id, payload::text as payload from branch_page" + (branchId == null ? "" : " where branch_id=?");
+        result.put("branchPages", branchId == null
+            ? jdbc.query(pagesSql, (rs, n) -> Map.of("branchId", rs.getInt("branch_id"), "payload", jsonMap(rs.getString("payload"))))
+            : jdbc.query(pagesSql, (rs, n) -> Map.of("branchId", rs.getInt("branch_id"), "payload", jsonMap(rs.getString("payload"))), branchId));
         return result;
     }
 
@@ -78,53 +92,78 @@ public class WebsiteCmsController {
     }
 
     @PutMapping("/admin/website/branches/{branchId}")
-    @PreAuthorize(Roles.ADMIN)
-    public Map<String, Object> saveBranchPage(@PathVariable int branchId, @RequestBody Map<String, Object> payload) {
+    @PreAuthorize(Roles.MANAGEMENT)
+    public Map<String, Object> saveBranchPage(@PathVariable int branchId, @RequestBody Map<String, Object> payload, @CurrentUser Integer staffId) {
+        branchAccess.check(staffId, branchId);
         String json = write(payload);
         int changed = jdbc.update("insert into branch_page(branch_id,payload,updated_at) values(?,?::jsonb,now()) on conflict(branch_id) do update set payload=excluded.payload, updated_at=now()", branchId, json);
         return payload;
     }
 
     @GetMapping("/admin/website/{resource}")
-    @PreAuthorize(Roles.ADMIN)
-    public List<Map<String, Object>> adminList(@PathVariable String resource, @RequestParam(required = false) Integer branchId) {
-        return visibleRows(table(resource), branchId);
+    @PreAuthorize(Roles.MANAGEMENT)
+    public List<Map<String, Object>> adminList(@PathVariable String resource, @RequestParam(required = false) Integer branchId, @CurrentUser Integer staffId) {
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        Integer scopedBranchId = requestedBranch(branchId, staff);
+        return visibleRows(table(resource), scopedBranchId);
     }
 
     @PostMapping("/admin/website/{resource}")
-    @PreAuthorize(Roles.ADMIN)
-    public ResponseEntity<Map<String, Object>> create(@PathVariable String resource, @RequestBody Map<String, Object> payload) {
+    @PreAuthorize(Roles.MANAGEMENT)
+    public ResponseEntity<Map<String, Object>> create(@PathVariable String resource, @RequestBody Map<String, Object> payload, @CurrentUser Integer staffId) {
         String table = table(resource);
+        payload = new LinkedHashMap<>(payload);
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        if (staff.getRole() == StaffRole.MANAGER) {
+            requestedBranch(branchId(payload), staff);
+            payload.put("branchId", staff.getBranchId());
+        }
         validatePrice(resource, payload);
         Map<String, Object> saved = persist(table, null, payload);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/admin/website/{resource}/{id}")
-    @PreAuthorize(Roles.ADMIN)
-    public Map<String, Object> update(@PathVariable String resource, @PathVariable long id, @RequestBody Map<String, Object> payload) {
+    @PreAuthorize(Roles.MANAGEMENT)
+    public Map<String, Object> update(@PathVariable String resource, @PathVariable long id, @RequestBody Map<String, Object> payload, @CurrentUser Integer staffId) {
+        String table = table(resource);
+        payload = new LinkedHashMap<>(payload);
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        if (staff.getRole() == StaffRole.MANAGER) {
+            checkRowBranch(table, id, staff);
+            requestedBranch(branchId(payload), staff);
+            payload.put("branchId", staff.getBranchId());
+        }
         validatePrice(resource, payload);
-        return persist(table(resource), id, payload);
+        return persist(table, id, payload);
     }
 
     @PutMapping("/admin/website/{resource}/order")
-    @PreAuthorize(Roles.ADMIN)
-    public ResponseEntity<Void> reorder(@PathVariable String resource, @RequestBody List<Long> ids) {
+    @PreAuthorize(Roles.MANAGEMENT)
+    public ResponseEntity<Void> reorder(@PathVariable String resource, @RequestBody List<Long> ids, @CurrentUser Integer staffId) {
         String table = table(resource);
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        if (staff.getRole() == StaffRole.MANAGER) ids.forEach(id -> checkRowBranch(table, id, staff));
         for (int i = 0; i < ids.size(); i++) jdbc.update("update " + table + " set sort_order=? where id=?", i, ids.get(i));
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/admin/website/{resource}/{id}")
-    @PreAuthorize(Roles.ADMIN)
-    public ResponseEntity<Void> delete(@PathVariable String resource, @PathVariable long id) {
-        jdbc.update("delete from " + table(resource) + " where id=?", id);
+    @PreAuthorize(Roles.MANAGEMENT)
+    public ResponseEntity<Void> delete(@PathVariable String resource, @PathVariable long id, @CurrentUser Integer staffId) {
+        String table = table(resource);
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        if (staff.getRole() == StaffRole.MANAGER) checkRowBranch(table, id, staff);
+        jdbc.update("delete from " + table + " where id=?", id);
         return ResponseEntity.noContent().build();
     }
 
     private void validatePrice(String resource, Map<String, Object> payload) {
         if ("offers".equals(resource) && payload.get("price") instanceof Number n && n.longValue() < 0)
             throw new AppException(ErrorCode.INVALID_REQUEST, "Giá ưu đãi không được âm");
+        if ("testimonials".equals(resource) && !Boolean.FALSE.equals(payload.get("visible"))
+                && (payload.get("source") == null || payload.get("source").toString().isBlank()))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Đánh giá công khai cần có nguồn");
     }
 
     private String table(String resource) {
@@ -147,8 +186,8 @@ public class WebsiteCmsController {
             sql = id == null ? "insert into accolade(branch_id,award_year,content,sort_order,visible) values(?,?,?,?,?) returning id" : "update accolade set branch_id=?,award_year=?,content=?,sort_order=?,visible=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), pick(p, "year", "award_year"), p.get("content"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else if ("testimonial".equals(table)) {
-            sql = id == null ? "insert into testimonial(branch_id,quote,reviewer,title,sort_order,visible) values(?,?,?,?,?,?) returning id" : "update testimonial set branch_id=?,quote=?,reviewer=?,title=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("quote"), p.get("reviewer"), p.getOrDefault("title", ""), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
+            sql = id == null ? "insert into testimonial(branch_id,quote,reviewer,title,source,sort_order,visible) values(?,?,?,?,?,?,?) returning id" : "update testimonial set branch_id=?,quote=?,reviewer=?,title=?,source=?,sort_order=?,visible=? where id=? returning id";
+            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("quote"), p.get("reviewer"), p.getOrDefault("title", ""), p.getOrDefault("source", ""), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else if ("menu_file".equals(table)) {
             sql = id == null ? "insert into menu_file(branch_id,title,file_url,image_url,sort_order,visible) values(?,?,?,?,?,?) returning id" : "update menu_file set branch_id=?,title=?,file_url=?,image_url=?,sort_order=?,visible=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), p.get("title"), pick(p, "fileUrl", "file_url"), pick(p, "imageUrl", "image_url"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
@@ -163,14 +202,35 @@ public class WebsiteCmsController {
     }
 
     private List<Map<String, Object>> visibleRows(String table, Integer branchId) {
-        if (table.equals("site_setting")) return List.of(singleton(table));
+        if (table.equals("site_setting")) return branchId == null ? List.of(singleton(table)) : List.of();
         if (table.equals("branch_page")) return List.of();
         String sql = "select * from " + table + (branchId == null ? "" : " where branch_id=?") + " order by " + (table.equals("opening_hour") ? "weekday" : "sort_order,id");
         return branchId == null ? jdbc.queryForList(sql) : jdbc.queryForList(sql, branchId);
     }
 
+    private Integer requestedBranch(Integer requestedBranchId, StaffEntity staff) {
+        if (staff.getRole() == StaffRole.ADMIN) return requestedBranchId;
+        branchAccess.check(staff, requestedBranchId == null ? staff.getBranchId() : requestedBranchId);
+        if (requestedBranchId != null && !Objects.equals(requestedBranchId, staff.getBranchId())) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Không có quyền truy cập chi nhánh này");
+        }
+        return staff.getBranchId();
+    }
+
+    private Integer branchId(Map<String, Object> payload) {
+        Object value = pick(payload, "branchId", "branch_id");
+        return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private void checkRowBranch(String table, long id, StaffEntity staff) {
+        Integer branchId = jdbc.query("select branch_id from " + table + " where id=?", rs -> rs.next() ? (Integer) rs.getObject(1) : null, id);
+        if (branchId == null) throw new AppException(ErrorCode.FORBIDDEN, "Không có quyền truy cập nội dung này");
+        branchAccess.check(staff, branchId);
+    }
+
     private List<Map<String, Object>> publicRows(String table, Integer branchId) {
-        String sql = "select * from " + table + " where visible=true" + (branchId == null ? "" : " and branch_id=?") + " order by " + (table.equals("opening_hour") ? "weekday" : "sort_order,id");
+        String sourceRequired = table.equals("testimonial") ? " and source<>''" : "";
+        String sql = "select * from " + table + " where visible=true" + sourceRequired + (branchId == null ? "" : " and branch_id=?") + " order by " + (table.equals("opening_hour") ? "weekday" : "sort_order,id");
         return branchId == null ? jdbc.queryForList(sql) : jdbc.queryForList(sql, branchId);
     }
 

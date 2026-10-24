@@ -17,6 +17,8 @@ public class ReservationResponse {
     private Integer id;
     private Integer branchId;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private Integer tableId;
     private LocalDateTime reservationDate;
     private Integer numberOfGuests;
@@ -30,6 +32,8 @@ public class ReservationResponse {
         response.setId(entity.getId());
         response.setBranchId(entity.getBranchId());
         response.setCustomerId(entity.getCustomerId());
+        response.setCustomerName(entity.getCustomerName());
+        response.setCustomerPhone(entity.getCustomerPhone());
         response.setTableId(entity.getTableId());
         response.setReservationDate(entity.getReservedAt());
         response.setNumberOfGuests(entity.getGuestCount());

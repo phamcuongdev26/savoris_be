@@ -9,9 +9,11 @@ import com.savoris.dto.response.BranchLoadResponse;
 import com.savoris.dto.response.GuestOrderResponse;
 import com.savoris.dto.response.GuestTableResponse;
 import com.savoris.dto.response.PublicBranchResponse;
+import com.savoris.dto.response.BranchMenuItemResponse;
 import com.savoris.dto.response.WebTakeawayResponse;
 import com.savoris.entity.BranchEntity;
 import com.savoris.entity.OrderEntity;
+import com.savoris.entity.MenuItemEntity;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
 import com.savoris.repository.BranchRepository;
@@ -32,11 +34,14 @@ import com.savoris.service.OrderService;
 import com.savoris.payment.Sepay;
 import com.savoris.service.SettingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +67,7 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final TakeawayNotifier takeawayNotifier;
     private final WebPushSender webPushSender;
+    private final JdbcTemplate jdbc;
 
     private static final List<String> PUSH_HOSTS = List.of(
         "fcm.googleapis.com", "updates.push.services.mozilla.com", "push.services.mozilla.com",
@@ -76,11 +82,30 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
             .toList();
         Map<Integer, BranchLoadResponse> loads = kitchenService.computeLoadOfBranches(branches);
         return branches.stream()
-            .map(b -> new PublicBranchResponse(b.getId(), b.getCode(), b.getName(), b.getAddress(),
-                loads.get(b.getId()).isAcceptingTakeaway(), loads.get(b.getId()).getEstimatedWaitMinutes(),
-                settingService.transferAvailable(b.getId()),
-                b.getCity(), b.getLatitude(), b.getLongitude()))
+            .map(b -> {
+                boolean openNow = isOpenNow(b.getId());
+                return new PublicBranchResponse(b.getId(), b.getCode(), b.getName(), b.getAddress(),
+                    openNow && loads.get(b.getId()).isAcceptingTakeaway(), loads.get(b.getId()).getEstimatedWaitMinutes(),
+                    settingService.transferAvailable(b.getId()), b.getCity(), b.getLatitude(), b.getLongitude(), openNow,
+                    b.getPhone(), b.getEmail(), jdbc.query(
+                        "select weekday, opens_at, closes_at, closed from opening_hour where branch_id=? order by weekday",
+                        (rs, row) -> new PublicBranchResponse.Hours(dayName(rs.getInt("weekday")), formatHours(
+                            rs.getObject("opens_at", LocalTime.class), rs.getObject("closes_at", LocalTime.class), rs.getBoolean("closed"))), b.getId()));
+            })
             .toList();
+    }
+
+    private String dayName(int weekday) {
+        return switch (weekday) {
+            case 1 -> "Thứ Hai"; case 2 -> "Thứ Ba"; case 3 -> "Thứ Tư"; case 4 -> "Thứ Năm";
+            case 5 -> "Thứ Sáu"; case 6 -> "Thứ Bảy"; default -> "Chủ Nhật";
+        };
+    }
+
+    private String formatHours(LocalTime opensAt, LocalTime closesAt, boolean closed) {
+        if (closed) return "Nghỉ";
+        if (opensAt == null || closesAt == null) return "Đang cập nhật";
+        return opensAt.toString().substring(0, 5) + " – " + closesAt.toString().substring(0, 5);
     }
 
     @Override
@@ -94,13 +119,67 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
             menuCategoryRepository.findByIsActiveTrueOrderBySortOrderAscNameAsc().stream()
                 .map(c -> new GuestTableResponse.Category(c.getId(), c.getName()))
                 .toList(),
-            branchMenuService.getPublicMenu(branch.getId()));
+            branchMenuService.getPublicMenu(branch.getId()).stream()
+                .filter(BranchMenuItemResponse::isTakeawayAvailable)
+                .toList());
     }
 
     @Override
     public WebTakeawayResponse placeOrder(WebTakeawayRequest request) {
+        Map<Integer, Boolean> takeawayFlags = menuItemRepository.findAllById(
+                request.items().stream().map(com.savoris.dto.request.CreateOrderRequest.OrderItemRequest::getMenuItemId).toList())
+            .stream().collect(java.util.stream.Collectors.toMap(MenuItemEntity::getId,
+                item -> !Boolean.FALSE.equals(item.getTakeawayAvailable())));
+        boolean containsTakeawayDisabled = request.items().stream()
+            .anyMatch(item -> !Boolean.TRUE.equals(takeawayFlags.get(item.getMenuItemId())));
+        if (containsTakeawayDisabled) {
+            throw new AppException(ErrorCode.MENU_ITEM_UNAVAILABLE, "Món này không bán mang về");
+        }
+        if (!isOpenNow(request.branchId())) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Chi nhánh đã đóng cửa theo giờ hoạt động");
+        }
+        validatePickupTime(request.branchId(), request.pickupAt());
         return getOrder(orderService.placeWebTakeaway(request));
     }
+
+    private void validatePickupTime(Integer branchId, LocalDateTime pickupAt) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        if (pickupAt == null || !pickupAt.isAfter(now)) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Giờ lấy món phải ở thời điểm trong tương lai");
+        }
+        int weekday = pickupAt.getDayOfWeek().getValue();
+        List<OpeningHours> hoursForDay = jdbc.query(
+            "select opens_at, closes_at, closed from opening_hour where branch_id=? and weekday=?",
+            (rs, rowNum) -> new OpeningHours(rs.getObject("opens_at", LocalTime.class),
+                rs.getObject("closes_at", LocalTime.class), rs.getBoolean("closed")),
+            branchId, weekday);
+        if (hoursForDay.isEmpty()) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Chi nhánh chưa cài giờ mở cửa cho ngày lấy món");
+        }
+        OpeningHours hours = hoursForDay.get(0);
+        LocalTime time = pickupAt.toLocalTime();
+        if (hours.closed() || hours.opensAt() == null || hours.closesAt() == null
+                || time.isBefore(hours.opensAt()) || !time.isBefore(hours.closesAt())) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Giờ lấy món nằm ngoài giờ hoạt động của chi nhánh");
+        }
+    }
+
+    private boolean isOpenNow(Integer branchId) {
+        var now = java.time.ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        int weekday = now.getDayOfWeek().getValue();
+        List<OpeningHours> today = jdbc.query(
+            "select opens_at, closes_at, closed from opening_hour where branch_id=? and weekday=?",
+            (rs, rowNum) -> new OpeningHours(rs.getObject("opens_at", LocalTime.class),
+                rs.getObject("closes_at", LocalTime.class), rs.getBoolean("closed")),
+            branchId, weekday);
+        if (today.isEmpty()) return false;
+        OpeningHours hours = today.get(0);
+        LocalTime time = now.toLocalTime();
+        return !hours.closed() && hours.opensAt() != null && hours.closesAt() != null
+            && !time.isBefore(hours.opensAt()) && time.isBefore(hours.closesAt());
+    }
+
+    private record OpeningHours(LocalTime opensAt, LocalTime closesAt, boolean closed) {}
 
     @Override
     @Transactional(readOnly = true)
@@ -125,7 +204,7 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
             order.getGuestName(), order.getStatus(), order.getPayMethod(), paid, qr,
             order.getSubtotal(), order.getVatAmount(), order.getTotalAmount(), items,
             order.getTransferClaimedAt() != null, order.getCancelReason(),
-            account, account != null && sepay.enabled());
+            account, account != null && sepay.enabled(), order.getPickupAt());
     }
 
     @Override

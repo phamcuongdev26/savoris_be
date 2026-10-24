@@ -43,8 +43,6 @@ public class BranchServiceImpl implements BranchService {
             .email(request.getEmail())
             .latitude(request.getLatitude())
             .longitude(request.getLongitude())
-            .openTime(request.getOpenTime())
-            .closeTime(request.getCloseTime())
             .managerId(request.getManagerId())
             .status(BranchStatus.ACTIVE)
             .build();
@@ -83,8 +81,6 @@ public class BranchServiceImpl implements BranchService {
         branch.setEmail(request.getEmail());
         branch.setLatitude(request.getLatitude());
         branch.setLongitude(request.getLongitude());
-        branch.setOpenTime(request.getOpenTime());
-        branch.setCloseTime(request.getCloseTime());
         // Only ADMIN can reassign the manager or change kitchen capacity
         if (isAdmin) {
             branch.setManagerId(request.getManagerId());

@@ -6,5 +6,6 @@ package com.savoris.dto.response;
  */
 public record PublicBranchResponse(Integer id, String code, String name, String address, boolean acceptingTakeaway,
                                    Integer estimatedWaitMinutes, boolean transferAvailable, String city, Double latitude,
-                                   Double longitude) {
+                                   Double longitude, boolean openNow, String phone, String email, java.util.List<Hours> hours) {
+    public record Hours(String days, String time) {}
 }

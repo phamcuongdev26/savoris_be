@@ -196,6 +196,33 @@ public class ShiftServiceImpl implements ShiftService {
         return rows;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public TimesheetResponse getMyTimesheet(Integer actorId, LocalDate from, LocalDate to) {
+        checkRange(from, to);
+        StaffEntity person = staffRepository.findById(actorId)
+            .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND, "Staff not found: " + actorId));
+        List<StaffShiftEntity> assignments = staffShiftRepository
+            .findByStaffIdAndWorkDateBetweenOrderByWorkDate(actorId, from, to);
+
+        int worked = 0;
+        int missed = 0;
+        long minutes = 0;
+        for (StaffShiftEntity a : assignments) {
+            if (a.getCheckInAt() != null && a.getCheckOutAt() != null) {
+                worked++;
+                minutes += Duration.between(a.getCheckInAt(), a.getCheckOutAt()).toMinutes();
+            } else if (a.getCheckInAt() == null && a.getWorkDate().isBefore(LocalDate.now())) {
+                missed++;
+            }
+        }
+        BigDecimal hours = BigDecimal.valueOf(minutes).divide(SIXTY, 2, RoundingMode.HALF_UP);
+        BigDecimal rate = person.getHourlyRate() != null ? person.getHourlyRate() : BigDecimal.ZERO;
+        BigDecimal wage = BigDecimal.valueOf(minutes).multiply(rate).divide(SIXTY, 0, RoundingMode.HALF_UP);
+        return new TimesheetResponse(person.getId(), person.getFullName(), person.getRole(), worked, missed,
+            minutes, hours, rate, wage);
+    }
+
     private LocalDateTime shiftEnd(StaffShiftEntity assignment, ShiftEntity shift) {
         LocalDate endDate = shift.getEndTime().isBefore(shift.getStartTime())
             ? assignment.getWorkDate().plusDays(1)

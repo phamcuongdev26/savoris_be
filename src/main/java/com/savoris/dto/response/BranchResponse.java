@@ -23,8 +23,6 @@ public class BranchResponse {
     private String email;
     private Double latitude;
     private Double longitude;
-    private LocalDateTime openTime;
-    private LocalDateTime closeTime;
     private Integer managerId;
     private Integer kitchenCapacity;
     private BranchStatus status;
@@ -42,8 +40,6 @@ public class BranchResponse {
         response.setEmail(entity.getEmail());
         response.setLatitude(entity.getLatitude());
         response.setLongitude(entity.getLongitude());
-        response.setOpenTime(entity.getOpenTime());
-        response.setCloseTime(entity.getCloseTime());
         response.setManagerId(entity.getManagerId());
         response.setKitchenCapacity(entity.getKitchenCapacity());
         response.setStatus(entity.getStatus());

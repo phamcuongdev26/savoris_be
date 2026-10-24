@@ -19,4 +19,5 @@ public interface ShiftService {
     StaffShiftResponse checkIn(Integer actorId, Integer assignmentId);
     StaffShiftResponse checkOut(Integer actorId, Integer assignmentId);
     List<TimesheetResponse> getTimesheet(Integer actorId, Integer branchId, LocalDate from, LocalDate to);
+    TimesheetResponse getMyTimesheet(Integer actorId, LocalDate from, LocalDate to);
 }

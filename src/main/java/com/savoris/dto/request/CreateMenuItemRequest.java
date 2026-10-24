@@ -33,6 +33,7 @@ public class CreateMenuItemRequest {
     private String imageUrl;
     private String unit = "phần";
     private Boolean isActive = true;
+    private Boolean takeawayAvailable = true;
 
     // false = drink / ready-made: no kitchen, staff hand it out and mark it sold out
     private Boolean needsKitchen;

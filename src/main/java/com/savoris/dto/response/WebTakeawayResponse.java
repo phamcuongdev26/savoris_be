@@ -5,6 +5,7 @@ import com.savoris.constant.PaymentMethod;
 import com.savoris.service.SettingService.BankAccount;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -17,5 +18,5 @@ public record WebTakeawayResponse(String token, String code, String branchName, 
                                   OrderStatus status, PaymentMethod payMethod, boolean paid, String transferQrUrl,
                                   BigDecimal subtotal, BigDecimal vatAmount, BigDecimal totalAmount,
                                   List<GuestOrderResponse.Item> items, boolean transferClaimed, String cancelReason,
-                                  BankAccount bankAccount, boolean autoConfirm) {
+                                  BankAccount bankAccount, boolean autoConfirm, LocalDateTime pickupAt) {
 }

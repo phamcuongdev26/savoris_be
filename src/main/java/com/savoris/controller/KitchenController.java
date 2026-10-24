@@ -64,9 +64,9 @@ public class KitchenController {
     }
 
     @PutMapping("/items/{itemId}/served")
-    @Operation(summary = "Đã bưng món ra", description = "READY → SERVED")
+    @Operation(summary = "Đã bưng món ra", description = "READY → SERVED. Bếp đặt xong hoặc nhân viên bưng ra đều có thể xác nhận")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.KITCHEN)
+    @PreAuthorize(Roles.RESTAURANT)
     public ResponseEntity<KitchenTicketResponse> markServed(@CurrentUser Integer staffId, @PathVariable Integer itemId) {
         return ResponseEntity.ok(kitchenService.markServed(staffId, itemId));
     }

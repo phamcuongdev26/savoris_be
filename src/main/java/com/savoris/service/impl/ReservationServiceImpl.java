@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationRepository reservationRepository;
     private final CustomerRepository customerRepository;
     private final BranchAccessGuard branchAccessGuard;
+    private final JdbcTemplate jdbc;
 
     @Override
     @Transactional
@@ -92,10 +94,22 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional
+    public ReservationResponse markNoShow(Integer staffId, Integer reservationId) {
+        ReservationEntity reservation = findAccessible(staffId, reservationId);
+        if (reservation.getStatus() != ReservationStatus.PENDING && reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Only pending or confirmed reservations can be marked no-show");
+        }
+        reservation.setStatus(ReservationStatus.NO_SHOW);
+        reservation.setUpdatedAt(LocalDateTime.now());
+        return ReservationResponse.from(reservationRepository.save(reservation));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<ReservationResponse> getReservationsByBranch(Integer staffId, Integer branchId) {
         branchAccessGuard.check(staffId, branchId);
-        return reservationRepository.findByBranchIdAndStatus(branchId, ReservationStatus.PENDING)
+        return reservationRepository.findByBranchId(branchId)
             .stream()
             .map(ReservationResponse::from)
             .toList();
@@ -121,16 +135,10 @@ public class ReservationServiceImpl implements ReservationService {
     private static final int SLOT_MINUTES     = 30;
     private static final int MAX_GUESTS_SLOT  = 40;
 
-    // Fixed operating windows: Lunch 11:00-14:00, Dinner 17:00-22:00
-    private static final List<LocalTime[]> OPERATING_WINDOWS = List.of(
-        new LocalTime[]{ LocalTime.of(11, 0), LocalTime.of(14, 0) },
-        new LocalTime[]{ LocalTime.of(17, 0), LocalTime.of(22, 0) }
-    );
-
     @Override
     @Transactional(readOnly = true)
     public List<SlotAvailabilityResponse> getAvailableSlots(Integer branchId, LocalDate date) {
-        List<LocalDateTime> slots = generateSlots(date);
+        List<LocalDateTime> slots = generateSlots(branchId, date);
 
         List<SlotAvailabilityResponse> result = new ArrayList<>();
         LocalDateTime firstAvailableAfterFull = null;
@@ -138,7 +146,8 @@ public class ReservationServiceImpl implements ReservationService {
         for (LocalDateTime slot : slots) {
             LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
             int booked = reservationRepository
-                .findByBranchIdAndReservedAtBetweenAndStatusNot(branchId, slot, slotEnd, ReservationStatus.CANCELLED)
+                .findByBranchIdAndReservedAtBetweenAndStatusNotIn(branchId, slot, slotEnd,
+                    List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
                 .stream().mapToInt(ReservationEntity::getGuestCount).sum();
 
             boolean available = booked < MAX_GUESTS_SLOT;
@@ -166,12 +175,19 @@ public class ReservationServiceImpl implements ReservationService {
         return result;
     }
 
-    private List<LocalDateTime> generateSlots(LocalDate date) {
+    private List<LocalDateTime> generateSlots(Integer branchId, LocalDate date) {
         List<LocalDateTime> slots = new ArrayList<>();
-        for (LocalTime[] window : OPERATING_WINDOWS) {
-            LocalTime cursor = window[0];
+        int weekday = date.getDayOfWeek().getValue();
+        List<LocalTime[]> windows = jdbc.query(
+            "select opens_at, closes_at from opening_hour where branch_id=? and weekday=? and closed=false and opens_at is not null and closes_at is not null",
+            (rs, row) -> new LocalTime[]{rs.getObject("opens_at", LocalTime.class), rs.getObject("closes_at", LocalTime.class)},
+            branchId, weekday);
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        for (LocalTime[] window : windows) {
+            LocalTime cursor = window[0].withSecond(0).withNano(0);
             while (cursor.isBefore(window[1])) {
-                slots.add(date.atTime(cursor));
+                LocalDateTime slot = date.atTime(cursor);
+                if (slot.isAfter(now) && !slot.plusMinutes(SLOT_MINUTES).toLocalTime().isAfter(window[1])) slots.add(slot);
                 cursor = cursor.plusMinutes(SLOT_MINUTES);
             }
         }
@@ -183,10 +199,11 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse createGuestReservation(GuestReservationRequest request) {
         // Validate slot availability
         LocalDateTime slot = request.getReservationDate().withSecond(0).withNano(0);
+        validateOpeningHours(request.getBranchId(), slot);
         LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
         int booked = reservationRepository
-            .findByBranchIdAndReservedAtBetweenAndStatusNot(
-                request.getBranchId(), slot, slotEnd, ReservationStatus.CANCELLED)
+            .findByBranchIdAndReservedAtBetweenAndStatusNotIn(request.getBranchId(), slot, slotEnd,
+                List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
             .stream().mapToInt(ReservationEntity::getGuestCount).sum();
         if (booked + request.getNumberOfGuests() > MAX_GUESTS_SLOT) {
             throw new AppException(ErrorCode.INVALID_STATE,
@@ -205,5 +222,22 @@ public class ReservationServiceImpl implements ReservationService {
         ReservationEntity saved = reservationRepository.save(entity);
         log.info("Guest reservation {} for branch {} at {}", saved.getId(), request.getBranchId(), slot);
         return ReservationResponse.from(saved);
+    }
+
+    private void validateOpeningHours(Integer branchId, LocalDateTime slot) {
+        if (slot.getSecond() != 0 || slot.getNano() != 0 || slot.getMinute() % SLOT_MINUTES != 0) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Vui lòng chọn giờ theo khung 30 phút");
+        }
+        int weekday = slot.getDayOfWeek().getValue();
+        List<LocalTime[]> windows = jdbc.query(
+            "select opens_at, closes_at from opening_hour where branch_id=? and weekday=? and closed=false and opens_at is not null and closes_at is not null",
+            (rs, row) -> new LocalTime[]{rs.getObject("opens_at", LocalTime.class), rs.getObject("closes_at", LocalTime.class)},
+            branchId, weekday);
+        LocalTime time = slot.toLocalTime();
+        boolean inHours = windows.stream().anyMatch(window -> !time.isBefore(window[0])
+            && !time.plusMinutes(SLOT_MINUTES).isAfter(window[1]));
+        if (!slot.isAfter(LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))) || !inHours) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Giờ đặt bàn nằm ngoài giờ hoạt động của chi nhánh");
+        }
     }
 }

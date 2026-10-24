@@ -30,8 +30,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -57,6 +60,7 @@ public abstract class IntegrationTestSupport {
     @Autowired protected StaffRepository staffRepository;
     @Autowired protected AreaRepository areaRepository;
     @Autowired protected DiningTableRepository diningTableRepository;
+    @Autowired protected JdbcTemplate jdbcTemplate;
 
     @DynamicPropertySource
     static void jwtKeys(DynamicPropertyRegistry registry) throws Exception {
@@ -65,6 +69,10 @@ public abstract class IntegrationTestSupport {
 
     protected static int unique() {
         return UNIQUE.incrementAndGet();
+    }
+
+    protected String takeawayPickupAt() {
+        return LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusHours(2).withSecond(0).withNano(0).toString();
     }
 
     protected BranchEntity createBranch(Integer kitchenCapacity) {
@@ -77,6 +85,9 @@ public abstract class IntegrationTestSupport {
         branch.setStatus(BranchStatus.ACTIVE);
         branch.setKitchenCapacity(kitchenCapacity);
         branch = branchRepository.save(branch);
+        for (int weekday = 1; weekday <= 7; weekday++) {
+            jdbcTemplate.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'00:00','23:59:59',false)", branch.getId(), weekday);
+        }
 
         AreaEntity area = new AreaEntity();
         area.setBranchId(branch.getId());

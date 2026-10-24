@@ -5,6 +5,7 @@ import com.savoris.dto.request.UpdateMenuCategoryRequest;
 import com.savoris.dto.response.MenuCategoryResponse;
 import com.savoris.entity.MenuCategoryEntity;
 import com.savoris.repository.MenuCategoryRepository;
+import com.savoris.repository.MenuItemRepository;
 import com.savoris.service.MenuCategoryService;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
@@ -22,6 +23,7 @@ import java.util.List;
 public class MenuCategoryServiceImpl implements MenuCategoryService {
 
     private final MenuCategoryRepository categoryRepository;
+    private final MenuItemRepository itemRepository;
 
     @Override
     @Transactional
@@ -69,7 +71,12 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
         MenuCategoryEntity category = categoryRepository.findById(categoryId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Category not found: " + categoryId));
 
-        categoryRepository.delete(category);
+        if (itemRepository.existsByCategoryIdAndIsActiveTrueAndDeletedAtIsNull(categoryId)) {
+            throw new AppException(ErrorCode.INVALID_STATE, "Hãy chuyển hoặc ẩn các món trong danh mục trước khi xóa danh mục");
+        }
+
+        category.setIsActive(false);
+        categoryRepository.save(category);
         log.info("Deleted menu category: {}", category.getName());
     }
 

@@ -305,6 +305,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.AWAITING_PAYMENT);
         order.setGuestName(request.guestName().trim());
         order.setGuestPhone(request.guestPhone().trim());
+        order.setPickupAt(request.pickupAt());
         order.setPayMethod(request.payMethod());
         order.setPublicToken(UUID.randomUUID().toString().replace("-", ""));
         order.setNote(request.notes());

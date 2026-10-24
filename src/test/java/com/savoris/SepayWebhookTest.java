@@ -121,7 +121,7 @@ class SepayWebhookTest extends IntegrationTestSupport {
         // A plain cancelled cash order owes nothing
         String cash = mockMvc.perform(post("/public/takeaway-orders").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"guestName\":\"Lan\",\"guestPhone\":\"0912345678\","
-                    + "\"payMethod\":\"CASH\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":1}]}"))
+                    + "\"payMethod\":\"CASH\",\"pickupAt\":\"" + takeawayPickupAt() + "\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":1}]}"))
             .andReturn().getResponse().getContentAsString();
         mockMvc.perform(put("/orders/" + orderId(JsonPath.read(cash, "$.code")) + "/cancel").with(as(cashier))).andExpect(status().isOk());
 
@@ -168,7 +168,7 @@ class SepayWebhookTest extends IntegrationTestSupport {
     private ResultActions order() throws Exception {
         return mockMvc.perform(post("/public/takeaway-orders").contentType(MediaType.APPLICATION_JSON)
             .content("{\"branchId\":" + branch.getId() + ",\"guestName\":\"Lan\",\"guestPhone\":\"0912345678\","
-                + "\"payMethod\":\"BANK_TRANSFER\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"));
+                + "\"payMethod\":\"BANK_TRANSFER\",\"pickupAt\":\"" + takeawayPickupAt() + "\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"));
     }
 
     private ResultActions webhook(String key, long id, String type, long amount, String content) throws Exception {

@@ -49,11 +49,13 @@ public class BootstrapDataSeeder implements ApplicationRunner {
                 created.setStatus(BranchStatus.ACTIVE);
                 return created;
             });
-            if (branch.getName() == null || branch.getName().startsWith("Chi nhánh ")) {
-                branch.setName("CN%d %s".formatted(i, district));
+            branch.setName(district);
+            if (branch.getAddress() == null || branch.getAddress().trim().length() < 10) {
+                branch.setAddress("DỮ LIỆU DEMO · Số 00, Phố Mẫu CN%02d, %s".formatted(i, district));
             }
-            if (branch.getAddress() == null || branch.getAddress().equals("Chưa cập nhật")) branch.setAddress(district);
             if (branch.getCity() == null || branch.getCity().equals("Chưa cập nhật")) branch.setCity("Hà Nội");
+            if (branch.getPhone() == null || branch.getPhone().isBlank()) branch.setPhone("000000000%d".formatted(i));
+            if (branch.getEmail() == null || branch.getEmail().isBlank()) branch.setEmail("cn%02d@savoris.invalid".formatted(i));
             branch = branchRepository.save(branch);
         }
         log.info("Ensured branches CN01–CN04");

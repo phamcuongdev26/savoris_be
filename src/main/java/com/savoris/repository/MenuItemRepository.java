@@ -25,4 +25,5 @@ public interface MenuItemRepository extends JpaRepository<MenuItemEntity, Intege
     List<MenuItemEntity> findByCategoryId(Integer categoryId);
     List<MenuItemEntity> findByNameContainingIgnoreCase(String name);
     List<MenuItemEntity> findByIsActiveTrueAndDeletedAtIsNullOrderByCategoryIdAscNameAsc();
+    boolean existsByCategoryIdAndIsActiveTrueAndDeletedAtIsNull(Integer categoryId);
 }

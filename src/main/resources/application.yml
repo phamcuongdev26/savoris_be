@@ -74,7 +74,7 @@ savoris:
   cloudinary:
     # cloudinary://API_KEY:API_SECRET@CLOUD_NAME (Cloudinary dashboard > API Keys). Empty = no photo upload;
     # the bank QR is then kept in the database
-    url: ${CLOUDINARY_URL:cloudinary://821919131529351:6fU5WStecoFRD_LBAfwYF0sAE5Y@kizhftbe}
+    url: ${CLOUDINARY_URL:}
   media:
     storage-dir: ${MEDIA_STORAGE_DIR:./media}
   sepay:

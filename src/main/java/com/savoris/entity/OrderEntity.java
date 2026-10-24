@@ -101,6 +101,9 @@ public class OrderEntity {
     @Column(name = "guest_phone", length = 20)
     private String guestPhone;
 
+    @Column(name = "pickup_at")
+    private LocalDateTime pickupAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "pay_method", length = 20)
     private PaymentMethod payMethod;

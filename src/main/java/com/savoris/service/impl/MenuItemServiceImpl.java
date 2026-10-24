@@ -39,6 +39,7 @@ public class MenuItemServiceImpl implements MenuItemService {
             .imageUrl(request.getImageUrl())
             .unit(request.getUnit() != null ? request.getUnit() : "phần")
             .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+            .takeawayAvailable(request.getTakeawayAvailable() != null ? request.getTakeawayAvailable() : true)
             .needsKitchen(request.getNeedsKitchen() != null ? request.getNeedsKitchen() : true)
             .build();
 
@@ -62,6 +63,9 @@ public class MenuItemServiceImpl implements MenuItemService {
 
         item.setName(request.getName());
         item.setDescription(request.getDescription());
+        if (request.getCategoryId() != null) {
+            item.setCategoryId(request.getCategoryId());
+        }
         if (request.getBasePrice() != null) {
             item.setBasePrice(request.getBasePrice());
         }
@@ -73,6 +77,9 @@ public class MenuItemServiceImpl implements MenuItemService {
         }
         if (request.getIsActive() != null) {
             item.setIsActive(request.getIsActive());
+        }
+        if (request.getTakeawayAvailable() != null) {
+            item.setTakeawayAvailable(request.getTakeawayAvailable());
         }
         if (request.getNeedsKitchen() != null) {
             item.setNeedsKitchen(request.getNeedsKitchen());
@@ -89,7 +96,9 @@ public class MenuItemServiceImpl implements MenuItemService {
         MenuItemEntity item = itemRepository.findById(itemId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Item not found: " + itemId));
 
-        itemRepository.delete(item);
+        item.setIsActive(false);
+        item.setDeletedAt(LocalDateTime.now());
+        itemRepository.save(item);
         log.info("Deleted menu item: {} ({})", item.getName(), item.getCode());
     }
 

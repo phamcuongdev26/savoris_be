@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
 
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -49,6 +50,7 @@ class WebTakeawayTest extends IntegrationTestSupport {
     void cashOrderWaitsOutsideTheKitchenUntilTheCashierTakesTheMoney() throws Exception {
         String placed = order("CASH").andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))
+            .andExpect(jsonPath("$.pickupAt").exists())
             .andExpect(jsonPath("$.paid").value(false))
             .andExpect(jsonPath("$.transferQrUrl").doesNotExist())
             .andReturn().getResponse().getContentAsString();
@@ -212,7 +214,7 @@ class WebTakeawayTest extends IntegrationTestSupport {
     private ResultActions order(String payMethod) throws Exception {
         return mockMvc.perform(post("/public/takeaway-orders").contentType(MediaType.APPLICATION_JSON)
             .content("{\"branchId\":" + branch.getId() + ",\"guestName\":\"Lan\",\"guestPhone\":\"0912345678\","
-                + "\"payMethod\":\"" + payMethod + "\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"));
+                + "\"payMethod\":\"" + payMethod + "\",\"pickupAt\":\"" + takeawayPickupAt() + "\",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"));
     }
 
     private void setTransferQr(String url) throws Exception {

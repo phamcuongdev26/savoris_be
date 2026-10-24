@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.*;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -29,6 +30,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,6 +60,7 @@ class AuthBranchHttpTest {
     @Autowired StaffRepository staff;
     @Autowired RefreshTokenRepository refreshTokens;
     @Autowired PasswordEncoder passwords;
+    @Autowired JdbcTemplate jdbc;
     @LocalServerPort int port;
 
     private BranchEntity cn1;
@@ -68,13 +73,33 @@ class AuthBranchHttpTest {
     @BeforeEach
     void setUp() {
         refreshTokens.deleteAll();
+        jdbc.update("delete from audit_logs");
+        jdbc.update("update branches set manager_id=null");
         staff.deleteAll();
+        jdbc.update("delete from branch_page");
+        jdbc.update("delete from testimonial");
+        jdbc.update("delete from accolade");
+        jdbc.update("delete from gallery_image");
+        jdbc.update("delete from offer");
+        jdbc.update("delete from menu_file");
+        jdbc.update("delete from payments");
+        jdbc.update("delete from point_transactions");
+        jdbc.update("delete from order_items");
+        jdbc.update("delete from orders");
+        jdbc.update("delete from reservations");
+        jdbc.update("delete from branch_menu_items");
+        jdbc.update("delete from code_sequences");
+        jdbc.update("delete from opening_hour");
+        jdbc.update("delete from site_setting");
         branches.deleteAll();
         cn1 = branch("CN1"); cn2 = branch("CN2");
         admin = user("admin-http", StaffRole.ADMIN, null, StaffStatus.ACTIVE);
         manager = user("manager-http", StaffRole.MANAGER, cn1, StaffStatus.ACTIVE);
         manager2 = user("manager2-http", StaffRole.MANAGER, cn2, StaffStatus.ACTIVE);
         chef = user("chef-http", StaffRole.CHEF, cn1, StaffStatus.ACTIVE);
+        cn1.setManagerId(manager.getId());
+        cn1.setKitchenCapacity(7);
+        cn1 = branches.save(cn1);
     }
 
     @Test
@@ -88,6 +113,9 @@ class AuthBranchHttpTest {
         assertEquals(200, response.statusCode());
         assertEquals(4, response.body().split("\\\"code\\\"").length - 1);
         for (String code : List.of("CN1", "CN2", "CN3", "CN4")) assertTrue(response.body().contains(code));
+        assertTrue(response.body().contains("\"phone\""));
+        assertTrue(response.body().contains("\"email\""));
+        assertTrue(response.body().contains("\"hours\""));
     }
 
     @Test
@@ -119,21 +147,165 @@ class AuthBranchHttpTest {
     }
 
     @Test
-    void onlyAdminMayEditBranchAndChangePersists() throws Exception {
+    void managersMayEditOwnBranchButNotAnotherBranch() throws Exception {
         String chefCookie = accessCookie(login("chef-http", "Correct@123"));
         String managerCookie = accessCookie(login("manager-http", "Correct@123"));
-        String update = "{\"name\":\"Hoàn Kiếm cập nhật\",\"address\":\"Phố Huế\",\"city\":\"Hà Nội\",\"phone\":\"0900000000\",\"email\":\"cn1@savoris.vn\"}";
+        String update = "{\"name\":\"Hoàn Kiếm cập nhật\",\"address\":\"Số 12 Phố Huế, Hoàn Kiếm\",\"city\":\"Hà Nội\",\"phone\":\"0900000000\",\"email\":\"cn1@savoris.vn\",\"managerId\":" + manager2.getId() + ",\"kitchenCapacity\":1}";
         assertEquals(403, exchange(HttpMethod.PUT, "/branches/" + cn1.getId(), update, chefCookie).statusCode());
-        assertEquals(403, exchange(HttpMethod.PUT, "/branches/" + cn1.getId(), update, managerCookie).statusCode());
+        assertEquals(200, exchange(HttpMethod.PUT, "/branches/" + cn1.getId(), update, managerCookie).statusCode());
+        BranchEntity updated = branches.findById(cn1.getId()).orElseThrow();
+        assertEquals("Hoàn Kiếm cập nhật", updated.getName());
+        assertEquals(manager.getId(), updated.getManagerId());
+        assertEquals(7, updated.getKitchenCapacity());
+        assertEquals(403, exchange(HttpMethod.PUT, "/branches/" + cn2.getId(), update, managerCookie).statusCode());
         String adminCookie = accessCookie(login("admin-http", "Correct@123"));
         assertEquals(200, exchange(HttpMethod.PUT, "/branches/" + cn1.getId(), update, adminCookie).statusCode());
-        assertEquals("Hoàn Kiếm cập nhật", branches.findById(cn1.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void websiteCmsIsAuthenticatedAndScopedForBranchManagers() throws Exception {
+        assertEquals(401, exchange(HttpMethod.GET, "/admin/website", null, null).statusCode());
+        String chefCookie = accessCookie(login("chef-http", "Correct@123"));
+        assertEquals(403, exchange(HttpMethod.GET, "/admin/website", null, chefCookie).statusCode());
+
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+        HttpResponse<String> website = exchange(HttpMethod.GET, "/admin/website", null, managerCookie);
+        assertEquals(200, website.statusCode());
+        assertTrue(website.body().contains("\"code\":\"CN1"));
+        assertFalse(website.body().contains("\"code\":\"CN2"));
+        assertFalse(website.body().contains("\"settings\""));
+        assertEquals(200, exchange(HttpMethod.PUT, "/admin/website/branches/" + cn1.getId(), "{\"introduction\":\"Bài giới thiệu\"}", managerCookie).statusCode());
+        assertEquals(403, exchange(HttpMethod.PUT, "/admin/website/branches/" + cn2.getId(), "{\"introduction\":\"Không được sửa\"}", managerCookie).statusCode());
+        assertEquals(201, exchange(HttpMethod.POST, "/admin/website/gallery", "{\"branchId\":" + cn1.getId() + ",\"imageUrl\":\"https://example.com/own.jpg\",\"alt\":\"CN1\"}", managerCookie).statusCode());
+        assertEquals(403, exchange(HttpMethod.POST, "/admin/website/gallery", "{\"branchId\":" + cn2.getId() + ",\"imageUrl\":\"https://example.com/other.jpg\",\"alt\":\"CN2\"}", managerCookie).statusCode());
+        assertEquals(403, exchange(HttpMethod.PUT, "/admin/website/settings", "{}", managerCookie).statusCode());
+    }
+
+    @Test
+    void branchCreateRequiresPhoneAndEmail() throws Exception {
+        String adminCookie = accessCookie(login("admin-http", "Correct@123"));
+        String incomplete = "{\"code\":\"CN99\",\"name\":\"Ba Đình\",\"address\":\"Số 10 phố X, Ba Đình\",\"city\":\"Hà Nội\"}";
+        assertEquals(400, exchange(HttpMethod.POST, "/branches", incomplete, adminCookie).statusCode());
+        String shortAddress = "{\"code\":\"CN98\",\"name\":\"Ba Đình\",\"address\":\"Hà Nội\",\"city\":\"Hà Nội\",\"phone\":\"0900000000\",\"email\":\"bad-address@savoris.vn\"}";
+        assertEquals(400, exchange(HttpMethod.POST, "/branches", shortAddress, adminCookie).statusCode());
+    }
+
+    @Test
+    void takeawayAvailabilityUsesTheCurrentVietnameseWeekdayHours() throws Exception {
+        int weekday = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).getDayOfWeek().getValue();
+        jdbc.update("insert into opening_hour(branch_id,weekday,closed) values(?,?,true)", cn1.getId(), weekday);
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'00:00','23:59:59',false)", cn2.getId(), weekday);
+
+        HttpResponse<String> response = exchange(HttpMethod.GET, "/public/branches", null, null);
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("\"openNow\":false"));
+        assertTrue(response.body().contains("\"openNow\":true"));
+        assertTrue(response.body().contains("\"acceptingTakeaway\":false"));
+        String order = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách\",\"guestPhone\":\"0912345678\",\"payMethod\":\"CASH\",\"pickupAt\":\"" + pickupAt() + "\",\"items\":[{\"menuItemId\":1,\"quantity\":1}]}";
+        assertEquals(409, exchange(HttpMethod.POST, "/public/takeaway-orders", order, null).statusCode());
+    }
+
+    @Test
+    void guestReservationSlotsUseBranchHoursAndAdminCanFilterAndMarkNoShow() throws Exception {
+        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1);
+        int weekday = tomorrow.getDayOfWeek().getValue();
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'15:00','16:00',false)", cn1.getId(), weekday);
+
+        HttpResponse<String> slots = exchange(HttpMethod.GET,
+            "/reservations/guest/slots?branchId=" + cn1.getId() + "&date=" + tomorrow, null, null);
+        assertEquals(200, slots.statusCode());
+        assertTrue(slots.body().contains(tomorrow.atTime(15, 0).toString()));
+        assertTrue(slots.body().contains(tomorrow.atTime(15, 30).toString()));
+        assertFalse(slots.body().contains(tomorrow.atTime(16, 0).toString()));
+
+        String invalid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(16, 0) + "\",\"numberOfGuests\":2}";
+        assertEquals(409, exchange(HttpMethod.POST, "/reservations/guest", invalid, null).statusCode());
+        String valid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(15, 30) + "\",\"numberOfGuests\":2}";
+        HttpResponse<String> created = exchange(HttpMethod.POST, "/reservations/guest", valid, null);
+        assertEquals(201, created.statusCode());
+        int reservationId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build().readTree(created.body()).get("id").asInt();
+
+        String adminCookie = accessCookie(login("admin-http", "Correct@123"));
+        HttpResponse<String> filtered = exchange(HttpMethod.GET,
+            "/reservations/branch/" + cn1.getId() + "?date=" + tomorrow + "&status=PENDING", null, adminCookie);
+        assertEquals(200, filtered.statusCode());
+        assertTrue(filtered.body().contains("\"id\":" + reservationId));
+        assertTrue(exchange(HttpMethod.PUT, "/reservations/" + reservationId + "/no-show", "{}", adminCookie).body().contains("NO_SHOW"));
+        assertTrue(exchange(HttpMethod.GET,
+            "/reservations/branch/" + cn1.getId() + "?date=" + tomorrow + "&status=NO_SHOW", null, adminCookie).body()
+            .contains("\"id\":" + reservationId));
+    }
+
+    @Test
+    void adminMenuItemsControlWhetherTheyAppearInTakeawayMenu() throws Exception {
+        String adminCookie = accessCookie(login("admin-http", "Correct@123"));
+        String categoryName = "Mang về " + IDS.incrementAndGet();
+        HttpResponse<String> category = exchange(HttpMethod.POST, "/menu-categories",
+            "{\"name\":\"" + categoryName + "\",\"sortOrder\":1}", adminCookie);
+        assertEquals(201, category.statusCode());
+        int categoryId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+            .readTree(category.body()).get("id").asInt();
+
+        String itemBase = "\"categoryId\":" + categoryId + ",\"basePrice\":120000,\"unit\":\"phần\",\"isActive\":true";
+        String code = "TA" + IDS.incrementAndGet();
+        HttpResponse<String> takeawayItem = exchange(HttpMethod.POST, "/menu-items",
+            "{\"code\":\"" + code + "\",\"name\":\"Món mang về\"," + itemBase + ",\"takeawayAvailable\":true}", adminCookie);
+        assertEquals(201, takeawayItem.statusCode());
+        int takeawayItemId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+            .readTree(takeawayItem.body()).get("id").asInt();
+        assertEquals(200, exchange(HttpMethod.PUT, "/menu-items/" + takeawayItemId + "/branches",
+            "{\"branchIds\":[" + cn1.getId() + "]}", adminCookie).statusCode());
+
+        HttpResponse<String> dineInOnlyItem = exchange(HttpMethod.POST, "/menu-items",
+            "{\"code\":\"" + code + "X\",\"name\":\"Món chỉ tại chỗ\"," + itemBase + ",\"takeawayAvailable\":false}", adminCookie);
+        assertEquals(201, dineInOnlyItem.statusCode());
+
+        HttpResponse<String> menu = exchange(HttpMethod.GET, "/public/branches/" + cn1.getId() + "/menu", null, null);
+        assertEquals(200, menu.statusCode());
+        assertTrue(menu.body().contains("Món mang về"));
+        assertFalse(menu.body().contains("Món chỉ tại chỗ"));
+        HttpResponse<String> otherBranchMenu = exchange(HttpMethod.GET, "/public/branches/" + cn2.getId() + "/menu", null, null);
+        assertFalse(otherBranchMenu.body().contains("Món mang về"));
+        assertEquals(200, exchange(HttpMethod.PUT, "/branches/" + cn1.getId() + "/menu/" + takeawayItemId + "/availability",
+            "{\"available\":false}", adminCookie).statusCode());
+        assertTrue(exchange(HttpMethod.GET, "/public/branches/" + cn1.getId() + "/menu", null, null).body()
+            .contains("\"available\":false"));
+        int dineInOnlyId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+            .readTree(dineInOnlyItem.body()).get("id").asInt();
+        int weekday = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).getDayOfWeek().getValue();
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'00:00','23:59:59',false)", cn1.getId(), weekday);
+        String order = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách\",\"guestPhone\":\"0912345678\",\"payMethod\":\"CASH\",\"pickupAt\":\"" + pickupAt() + "\",\"items\":[{\"menuItemId\":" + dineInOnlyId + ",\"quantity\":1}]}";
+        HttpResponse<String> rejectedOrder = exchange(HttpMethod.POST, "/public/takeaway-orders", order, null);
+        assertEquals(409, rejectedOrder.statusCode());
+        assertTrue(rejectedOrder.body().contains("MENU_ITEM_UNAVAILABLE"));
+
+        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1);
+        int tomorrowWeekday = tomorrow.getDayOfWeek().getValue();
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'15:00','16:00',false)", cn1.getId(), tomorrowWeekday);
+        String invalidPickup = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách\",\"guestPhone\":\"0912345678\",\"payMethod\":\"CASH\",\"pickupAt\":\"" + tomorrow.atTime(17, 0) + "\",\"items\":[{\"menuItemId\":" + takeawayItemId + ",\"quantity\":1}]}";
+        HttpResponse<String> outsideHours = exchange(HttpMethod.POST, "/public/takeaway-orders", invalidPickup, null);
+        assertEquals(409, outsideHours.statusCode());
+        assertTrue(outsideHours.body().contains("Giờ lấy món nằm ngoài giờ hoạt động"));
+
+        assertEquals(200, exchange(HttpMethod.PUT, "/branches/" + cn1.getId() + "/menu/" + takeawayItemId + "/availability",
+            "{\"available\":true}", adminCookie).statusCode());
+        String validPickup = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách\",\"guestPhone\":\"0912345678\",\"payMethod\":\"CASH\",\"pickupAt\":\"" + tomorrow.atTime(15, 30) + "\",\"items\":[{\"menuItemId\":" + takeawayItemId + ",\"quantity\":1}]}";
+        assertEquals(201, exchange(HttpMethod.POST, "/public/takeaway-orders", validPickup, null).statusCode());
+        assertTrue(exchange(HttpMethod.GET, "/dashboard/chain", null, adminCookie).body().contains("\"openOrders\":1"));
+        String chefCookie = accessCookie(login("chef-http", "Correct@123"));
+        HttpResponse<String> kitchenQueue = exchange(HttpMethod.GET, "/kitchen/branches/" + cn1.getId() + "/queue", null, chefCookie);
+        assertEquals(200, kitchenQueue.statusCode());
+        assertTrue(kitchenQueue.body().contains("\"awaitingPayment\":true"));
     }
 
     private HttpResponse<String> login(String username, String password) throws Exception {
         String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
         return CLIENT.send(HttpRequest.newBuilder(URI.create(url("/auth/login")))
             .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String pickupAt() {
+        return LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusHours(2).withSecond(0).withNano(0).toString();
     }
 
     private HttpResponse<String> createAs(String cookie, String role, Integer branchId) throws Exception {
@@ -165,7 +337,8 @@ class AuthBranchHttpTest {
 
     private BranchEntity branch(String code) {
         BranchEntity b = new BranchEntity(); b.setCode(code + IDS.incrementAndGet()); b.setName(code);
-        b.setAddress("Hà Nội"); b.setCity("Hà Nội"); b.setStatus(BranchStatus.ACTIVE); return branches.save(b);
+        b.setAddress("Số 1 phố Mẫu, Hoàn Kiếm"); b.setCity("Hà Nội"); b.setPhone("0900000000");
+        b.setEmail("demo" + IDS.incrementAndGet() + "@example.invalid"); b.setStatus(BranchStatus.ACTIVE); return branches.save(b);
     }
 
     private StaffEntity user(String username, StaffRole role, BranchEntity branch, StaffStatus status) {

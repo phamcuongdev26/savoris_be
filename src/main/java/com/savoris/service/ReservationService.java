@@ -13,6 +13,7 @@ public interface ReservationService {
     ReservationResponse getReservation(Integer staffId, Integer reservationId);
     ReservationResponse confirmReservation(Integer staffId, Integer reservationId);
     ReservationResponse cancelReservation(Integer staffId, Integer reservationId);
+    ReservationResponse markNoShow(Integer staffId, Integer reservationId);
     List<ReservationResponse> getReservationsByBranch(Integer staffId, Integer branchId);
     List<ReservationResponse> getReservationsByCustomer(Integer customerId);
 

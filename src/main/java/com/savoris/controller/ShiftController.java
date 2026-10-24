@@ -86,6 +86,17 @@ public class ShiftController {
         return ResponseEntity.ok(shiftService.getMySchedule(staffId, from, to));
     }
 
+    @GetMapping("/shifts/me/timesheet")
+    @Operation(summary = "Bảng công của tôi", description = "Giờ làm và tiền công của bản thân trong khoảng ngày")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.RESTAURANT)
+    public ResponseEntity<TimesheetResponse> getMyTimesheet(
+        @CurrentUser Integer staffId,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(shiftService.getMyTimesheet(staffId, from, to));
+    }
+
     @PutMapping("/shift-assignments/{assignmentId}/check-in")
     @Operation(summary = "Chấm công vào", description = "Chỉ ca của chính mình, từ 30 phút trước giờ vào ca đến hết ca")
     @SecurityRequirement(name = "bearerAuth")

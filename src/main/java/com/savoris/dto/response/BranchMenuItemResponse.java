@@ -30,4 +30,5 @@ public class BranchMenuItemResponse {
     private boolean needsKitchen;
     // Ready-made dish whose stock at this branch cannot make one more portion (counted in available = false)
     private boolean outOfStock;
+    private boolean takeawayAvailable;
 }

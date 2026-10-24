@@ -170,6 +170,6 @@ public class BranchMenuServiceImpl implements BranchMenuService {
         boolean available = override == null || Boolean.TRUE.equals(override.getIsAvailable());
         return new BranchMenuItemResponse(item.getId(), item.getCategoryId(), item.getCode(), item.getName(), item.getUnit(),
             item.getBasePrice(), branchPrice, branchPrice != null ? branchPrice : item.getBasePrice(), available, item.getImageUrl(),
-            !Boolean.FALSE.equals(item.getNeedsKitchen()), false);
+            !Boolean.FALSE.equals(item.getNeedsKitchen()), false, !Boolean.FALSE.equals(item.getTakeawayAvailable()));
     }
 }

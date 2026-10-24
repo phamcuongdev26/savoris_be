@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -19,6 +20,7 @@ public record WebTakeawayRequest(
     @NotBlank(message = "Phone is required") @Pattern(regexp = "^0\\d{9,10}$", message = "Phone must be 10-11 digits starting with 0")
     String guestPhone,
     @NotNull(message = "Payment method is required") PaymentMethod payMethod,
+    @NotNull(message = "Pickup time is required") LocalDateTime pickupAt,
     @Size(max = 500) String notes,
     @NotEmpty(message = "Order must contain at least one item") @Valid List<CreateOrderRequest.OrderItemRequest> items
 ) {
