@@ -65,7 +65,7 @@ class ChainDashboardTest extends IntegrationTestSupport {
 
     @Test
     void onlyTheChainOwnerCanSeeTheDashboard() throws Exception {
-        StaffEntity manager = createStaff(StaffRole.BRANCH_MANAGER, createBranch(null));
+        StaffEntity manager = createStaff(StaffRole.MANAGER, createBranch(null));
         mockMvc.perform(get("/dashboard/chain").with(as(manager))).andExpect(status().isForbidden());
         mockMvc.perform(get("/dashboard/chain")).andExpect(status().isUnauthorized());
     }

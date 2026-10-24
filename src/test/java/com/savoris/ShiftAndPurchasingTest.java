@@ -51,12 +51,12 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
-        cashier = createStaff(StaffRole.WAITER, branch);
+        manager = createStaff(StaffRole.MANAGER, branch);
+        cashier = createStaff(StaffRole.STAFF, branch);
         cashier.setHourlyRate(BigDecimal.valueOf(30000));
         staffRepository.save(cashier);
-        waiter = createStaff(StaffRole.WAITER, branch);
-        warehouse = createStaff(StaffRole.WAREHOUSE, branch);
+        waiter = createStaff(StaffRole.STAFF, branch);
+        warehouse = createStaff(StaffRole.STAFF, branch);
     }
 
     // ---------------------------------------------------------------- shifts
@@ -90,7 +90,7 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
                 .content(assignJson(cashier, tomorrow)))
             .andExpect(status().isConflict());
         // Staff of another branch
-        StaffEntity outsider = createStaff(StaffRole.WAITER, createBranch(null));
+        StaffEntity outsider = createStaff(StaffRole.STAFF, createBranch(null));
         mockMvc.perform(post("/shifts/" + shiftId + "/assignments").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content(assignJson(outsider, tomorrow)))
             .andExpect(status().isBadRequest());
@@ -224,7 +224,7 @@ class ShiftAndPurchasingTest extends IntegrationTestSupport {
         mockMvc.perform(post("/purchase-orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":[" + line + "]}"))
             .andExpect(status().isForbidden());
-        StaffEntity otherWarehouse = createStaff(StaffRole.WAREHOUSE, createBranch(null));
+        StaffEntity otherWarehouse = createStaff(StaffRole.STAFF, createBranch(null));
         mockMvc.perform(post("/purchase-orders").with(as(otherWarehouse)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"supplierId\":" + supplier.getId() + ",\"items\":[" + line + "]}"))
             .andExpect(status().isForbidden());

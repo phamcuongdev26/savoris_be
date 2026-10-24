@@ -31,10 +31,10 @@ class ReadyMadeAndStockTest extends IntegrationTestSupport {
     void setUp() throws Exception {
         branch = createBranch(null);
         admin = createStaff(StaffRole.ADMIN, null);
-        cashier = createStaff(StaffRole.WAITER, branch);
-        waiter = createStaff(StaffRole.WAITER, branch);
+        cashier = createStaff(StaffRole.STAFF, branch);
+        waiter = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        manager = createStaff(StaffRole.MANAGER, branch);
         coke = createMenuItem("Coca chai " + unique(), 20000);
         mockMvc.perform(put("/menu-items/" + coke.getId()).with(as(admin)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"" + coke.getName() + "\",\"needsKitchen\":false}"))

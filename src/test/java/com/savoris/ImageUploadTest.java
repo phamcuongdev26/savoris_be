@@ -25,7 +25,7 @@ class ImageUploadTest extends IntegrationTestSupport {
 
     @Test
     void onlyTheOwnerUploadsPhotos() throws Exception {
-        StaffEntity cashier = createStaff(StaffRole.WAITER, createBranch(null));
+        StaffEntity cashier = createStaff(StaffRole.STAFF, createBranch(null));
         mockMvc.perform(multipart("/images").file(new MockMultipartFile("file", "pho.png", "image/png", PNG)).with(as(cashier)))
             .andExpect(status().isForbidden());
     }

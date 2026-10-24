@@ -45,10 +45,10 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        waiter = createStaff(StaffRole.WAITER, branch);
-        cashier = createStaff(StaffRole.WAITER, branch);
+        waiter = createStaff(StaffRole.STAFF, branch);
+        cashier = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        manager = createStaff(StaffRole.MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
         tea = createMenuItem("Tra da", 5000);
     }
@@ -91,7 +91,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     @Test
     void addingToATakeawayOrderRespectsTheFullKitchen() throws Exception {
         BranchEntity small = createBranch(2);
-        StaffEntity smallCashier = createStaff(StaffRole.WAITER, small);
+        StaffEntity smallCashier = createStaff(StaffRole.STAFF, small);
         String takeaway = mockMvc.perform(post("/orders").with(as(smallCashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(small, "TAKEAWAY", null, dish(pho, 2))))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
@@ -220,7 +220,7 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         List<Boolean> available = JsonPath.read(menu, "$[?(@.menuItemId == " + pho.getId() + ")].available");
         assertThat(available).containsExactly(true);
 
-        StaffEntity otherManager = createStaff(StaffRole.BRANCH_MANAGER, createBranch(null));
+        StaffEntity otherManager = createStaff(StaffRole.MANAGER, createBranch(null));
         mockMvc.perform(put(menuUrl + "/availability").with(as(otherManager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"available\":false}"))
             .andExpect(status().isForbidden());
@@ -232,10 +232,10 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
     void managerResetsAForgottenPassword_andOldSessionsEnd() throws Exception {
         cashier.setPasswordHash(passwordEncoder.encode("Old@12345"));
         staffRepository.save(cashier);
-        String session = mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+        var loginResponse = mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + cashier.getUsername() + "\",\"password\":\"Old@12345\"}"))
-            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        String refreshToken = JsonPath.read(session, "$.refreshToken");
+            .andExpect(status().isOk()).andReturn().getResponse();
+        String refreshCookie = loginResponse.getCookie("savoris_refresh").getValue();
 
         mockMvc.perform(put("/staff/" + cashier.getId() + "/password").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"newPassword\":\"New@12345\"}"))
@@ -253,12 +253,11 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"" + cashier.getUsername() + "\",\"password\":\"New@12345\"}"))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/auth/refresh").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+        mockMvc.perform(post("/auth/refresh").cookie(new jakarta.servlet.http.Cookie("savoris_refresh", refreshCookie)))
             .andExpect(status().isUnauthorized());
 
         // A manager cannot reset another manager or the owner
-        StaffEntity otherManager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        StaffEntity otherManager = createStaff(StaffRole.MANAGER, branch);
         mockMvc.perform(put("/staff/" + otherManager.getId() + "/password").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"newPassword\":\"New@12345\"}"))
             .andExpect(status().isForbidden());

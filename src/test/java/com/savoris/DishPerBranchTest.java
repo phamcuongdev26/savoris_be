@@ -29,7 +29,7 @@ class DishPerBranchTest extends IntegrationTestSupport {
         sells = createBranch(null);
         doesNot = createBranch(null);
         admin = createStaff(StaffRole.ADMIN, null);
-        cashierThere = createStaff(StaffRole.WAITER, doesNot);
+        cashierThere = createStaff(StaffRole.STAFF, doesNot);
         crab = createMenuItem("Banh canh cua", 60000);
     }
 

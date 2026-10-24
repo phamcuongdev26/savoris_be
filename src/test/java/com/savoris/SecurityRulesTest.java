@@ -42,18 +42,19 @@ class SecurityRulesTest extends IntegrationTestSupport {
     void setUp() {
         branch = createBranch(null);
         owner = createStaff(StaffRole.ADMIN, null);
-        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
-        waiter = createStaff(StaffRole.WAITER, branch);
-        cashier = createStaff(StaffRole.WAITER, branch);
+        manager = createStaff(StaffRole.MANAGER, branch);
+        waiter = createStaff(StaffRole.STAFF, branch);
+        cashier = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        warehouse = createStaff(StaffRole.WAREHOUSE, branch);
+        warehouse = createStaff(StaffRole.STAFF, branch);
     }
 
     private String staffJson(String role, BranchEntity at) {
         int n = unique();
+        String branchId = "ADMIN".equals(role) ? "null" : String.valueOf(at.getId());
         return "{\"code\":\"N" + n + "\",\"fullName\":\"New " + n + "\",\"username\":\"new" + n + "\","
             + "\"email\":\"new" + n + "@savoris.vn\",\"phone\":\"0900" + n + "\",\"role\":\"" + role + "\","
-            + "\"branchId\":" + at.getId() + ",\"hourlyRate\":30000,\"password\":\"Welcome@123\"}";
+            + "\"branchId\":" + branchId + ",\"hourlyRate\":30000,\"password\":\"Welcome@123\"}";
     }
 
     @Test
@@ -66,22 +67,22 @@ class SecurityRulesTest extends IntegrationTestSupport {
     @Test
     void managerHiresOnlyFloorAndKitchenStaff_forTheirOwnBranch() throws Exception {
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(staffJson("WAITER", branch)))
+                .content(staffJson("STAFF", branch)))
             .andExpect(status().isCreated());
 
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content(staffJson("ADMIN", branch)))
             .andExpect(status().isForbidden());
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(staffJson("BRANCH_MANAGER", branch)))
+                .content(staffJson("MANAGER", branch)))
             .andExpect(status().isForbidden());
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
-                .content(staffJson("WAITER", createBranch(null))))
+                .content(staffJson("STAFF", createBranch(null))))
             .andExpect(status().isForbidden());
 
         // The chain owner may create anyone
         mockMvc.perform(post("/staff").with(as(owner)).contentType(MediaType.APPLICATION_JSON)
-                .content(staffJson("BRANCH_MANAGER", branch)))
+                .content(staffJson("MANAGER", branch)))
             .andExpect(status().isCreated());
     }
 
@@ -91,8 +92,6 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(chef)))
             .andExpect(status().isOk());
-        mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(warehouse)))
-            .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/orders").with(as(chef)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
@@ -113,19 +112,21 @@ class SecurityRulesTest extends IntegrationTestSupport {
     }
 
     @Test
-    void warehouseCanManageStockOnlyAtTheirOwnBranch() throws Exception {
+    void staffCannotManageStock_butManagerIsScopedToOwnBranch() throws Exception {
         BranchEntity otherBranch = createBranch(null);
 
         mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(warehouse)))
-            .andExpect(status().isOk());
+            .andExpect(status().isForbidden());
         mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(warehouse)))
             .andExpect(status().isForbidden());
-        mockMvc.perform(post("/inventory/branch/" + branch.getId() + "/import").with(as(warehouse))
+        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/inventory/branch/" + branch.getId() + "/import").with(as(manager))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"rows\":[{\"name\":\"Rice\",\"unit\":\"kg\",\"quantity\":10,\"minStock\":2}]}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.created").value(1));
-        mockMvc.perform(post("/inventory/branch/" + otherBranch.getId() + "/import").with(as(warehouse))
+        mockMvc.perform(post("/inventory/branch/" + otherBranch.getId() + "/import").with(as(manager))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"rows\":[{\"name\":\"Beef\",\"unit\":\"kg\",\"quantity\":10}]}"))
             .andExpect(status().isForbidden());
@@ -137,7 +138,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
     @Test
     void staffCreationIsWrittenToTheAuditLog() throws Exception {
-        String body = staffJson("WAITER", branch);
+        String body = staffJson("STAFF", branch);
         String username = body.replaceAll(".*\"username\":\"([^\"]+)\".*", "$1");
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isCreated());
@@ -152,7 +153,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
             Thread.sleep(50);
         }
         assertTrue(!logs.isEmpty(), "Staff creation should be persisted in the audit log");
-        assertTrue(logs.get(0).getNewValue().path("role").asText().equals("WAITER"));
+        assertTrue(logs.get(0).getNewValue().path("role").asText().equals("STAFF"));
     }
 
     @Test
@@ -172,9 +173,9 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
     @Test
     void managerCannotPromoteStaff() throws Exception {
-        StaffEntity cashier = createStaff(StaffRole.WAITER, branch);
+        StaffEntity cashier = createStaff(StaffRole.STAFF, branch);
         String promote = "{\"fullName\":\"X\",\"email\":\"x" + unique() + "@savoris.vn\",\"phone\":\"0900000000\","
-            + "\"role\":\"BRANCH_MANAGER\",\"branchId\":" + branch.getId() + ",\"hourlyRate\":1}";
+            + "\"role\":\"MANAGER\",\"branchId\":" + branch.getId() + ",\"hourlyRate\":1}";
         mockMvc.perform(put("/staff/" + cashier.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(promote))
             .andExpect(status().isForbidden());
         // ...and cannot touch the owner's account
@@ -191,11 +192,10 @@ class SecurityRulesTest extends IntegrationTestSupport {
     }
 
     @Test
-    void managerEditsOnlyTheirOwnBranch() throws Exception {
+    void onlyAdminCanEditBranchDetails() throws Exception {
         String update = "{\"name\":\"Renamed\",\"address\":\"1 Street\",\"city\":\"Ha Noi\",\"kitchenCapacity\":30}";
         mockMvc.perform(put("/branches/" + branch.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(update))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.kitchenCapacity").value(30));
+            .andExpect(status().isForbidden());
         BranchEntity other = createBranch(null);
         mockMvc.perform(put("/branches/" + other.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(update))
             .andExpect(status().isForbidden());
@@ -232,7 +232,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
     @Test
     void fiveWrongPasswordsBlockFurtherGuessesFromThatAddress() throws Exception {
-        StaffEntity cashier = createStaff(StaffRole.WAITER, branch);
+        StaffEntity cashier = createStaff(StaffRole.STAFF, branch);
         cashier.setPasswordHash(passwordEncoder.encode("Right@123"));
         staffRepository.save(cashier);
         String wrong = "{\"username\":\"" + cashier.getUsername() + "\",\"password\":\"Wrong@123\"}";
@@ -254,7 +254,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
     @Test
     void wrongGuessesAreForgottenAfterASuccessfulLogin() throws Exception {
-        StaffEntity cashier = createStaff(StaffRole.WAITER, branch);
+        StaffEntity cashier = createStaff(StaffRole.STAFF, branch);
         cashier.setPasswordHash(passwordEncoder.encode("Right@123"));
         staffRepository.save(cashier);
         String wrong = "{\"username\":\"" + cashier.getUsername() + "\",\"password\":\"Wrong@123\"}";

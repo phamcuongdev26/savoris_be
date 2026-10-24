@@ -50,9 +50,9 @@ class TableStockReservationTest extends IntegrationTestSupport {
     @BeforeEach
     void setUp() {
         branch = createBranch(null);
-        cashier = createStaff(StaffRole.WAITER, branch);
+        cashier = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        manager = createStaff(StaffRole.MANAGER, branch);
         pho = createMenuItem("Pho bo", 50000);
     }
 
@@ -79,7 +79,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
 
     @Test
     void tableNamesAreUniqueWithinABranch() throws Exception {
-        StaffEntity manager = createStaff(StaffRole.BRANCH_MANAGER, branch);
+        StaffEntity manager = createStaff(StaffRole.MANAGER, branch);
         String area = mockMvc.perform(post("/branches/" + branch.getId() + "/areas").with(as(manager))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Floor 2\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
@@ -100,7 +100,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.capacity").value(6));
         BranchEntity other = createBranch(null);
-        StaffEntity otherManager = createStaff(StaffRole.BRANCH_MANAGER, other);
+        StaffEntity otherManager = createStaff(StaffRole.MANAGER, other);
         int otherArea = areaRepository.findByBranchIdOrderByName(other.getId()).get(0).getId();
         mockMvc.perform(post("/areas/" + otherArea + "/tables").with(as(otherManager)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"T9\",\"capacity\":2}"))
@@ -153,7 +153,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$[0].ingredientId").value(beef.getId()));
 
         // Waiters have no business in the store room
-        StaffEntity waiter = createStaff(StaffRole.WAITER, branch);
+        StaffEntity waiter = createStaff(StaffRole.STAFF, branch);
         mockMvc.perform(get("/inventory/branch/" + branch.getId() + "/low-stock").with(as(waiter)))
             .andExpect(status().isForbidden());
     }
@@ -200,7 +200,7 @@ class TableStockReservationTest extends IntegrationTestSupport {
         mockMvc.perform(put("/reservations/" + id + "/cancel").with(as(cashier)))
             .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        StaffEntity outsider = createStaff(StaffRole.WAITER, createBranch(null));
+        StaffEntity outsider = createStaff(StaffRole.STAFF, createBranch(null));
         mockMvc.perform(get("/reservations/" + id).with(as(outsider))).andExpect(status().isForbidden());
     }
 

@@ -13,6 +13,8 @@ logging:
     org.springframework.security: WARN
 
 savoris:
+  cloudinary:
+    url: ""
   # Tests create exactly the data they need
   bootstrap:
     enabled: false
