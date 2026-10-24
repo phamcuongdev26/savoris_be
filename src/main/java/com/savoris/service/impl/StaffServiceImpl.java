@@ -30,7 +30,7 @@ import java.util.Set;
 public class StaffServiceImpl implements StaffService {
 
     private static final Set<StaffRole> BRANCH_MANAGED_ROLES =
-        EnumSet.of(StaffRole.WAITER, StaffRole.CHEF, StaffRole.WAREHOUSE);
+        EnumSet.of(StaffRole.STAFF, StaffRole.CHEF);
 
     private final StaffRepository staffRepository;
     private final PasswordEncoder passwordEncoder;
@@ -42,10 +42,16 @@ public class StaffServiceImpl implements StaffService {
     public StaffDetailResponse createStaff(Integer actorId, CreateStaffRequest request) {
         checkCanManage(findStaff(actorId), request.getBranchId(), request.getRole());
         if (staffRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new AppException(ErrorCode.DUPLICATE_USERNAME, "Username already exists: " + request.getUsername());
+            throw new AppException(ErrorCode.DUPLICATE_USERNAME, "Tên đăng nhập đã được sử dụng");
         }
         if (staffRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new AppException(ErrorCode.DUPLICATE_EMAIL, "Email already exists: " + request.getEmail());
+            throw new AppException(ErrorCode.DUPLICATE_EMAIL, "Email đã được sử dụng");
+        }
+        if (request.getRole() == StaffRole.ADMIN && request.getBranchId() != null) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tài khoản ADMIN không thuộc chi nhánh");
+        }
+        if (request.getRole() != StaffRole.ADMIN && request.getBranchId() == null) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tài khoản phải thuộc một chi nhánh");
         }
 
         StaffEntity staff = new StaffEntity();
@@ -75,8 +81,8 @@ public class StaffServiceImpl implements StaffService {
         if (!actorId.equals(staffId)) {
             StaffEntity actor = findStaff(actorId);
             if (actor.getRole() != StaffRole.ADMIN
-                && !(actor.getRole() == StaffRole.BRANCH_MANAGER && Objects.equals(actor.getBranchId(), staff.getBranchId()))) {
-                throw new AppException(ErrorCode.FORBIDDEN, "Cannot view staff " + staffId);
+                && !(actor.getRole() == StaffRole.MANAGER && Objects.equals(actor.getBranchId(), staff.getBranchId()))) {
+                throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền xem tài khoản này");
             }
         }
         return StaffDetailResponse.from(staff);
@@ -90,6 +96,8 @@ public class StaffServiceImpl implements StaffService {
         // Both the current and the new role/branch must be within what the actor may manage (no self-promotion).
         checkCanManage(actor, staff.getBranchId(), staff.getRole());
         checkCanManage(actor, request.getBranchId(), request.getRole());
+        staffRepository.findByEmail(request.getEmail()).filter(existing -> !existing.getId().equals(staffId))
+            .ifPresent(existing -> { throw new AppException(ErrorCode.DUPLICATE_EMAIL, "Email đã được sử dụng"); });
 
         staff.setFullName(request.getFullName());
         staff.setEmail(request.getEmail());
@@ -112,7 +120,7 @@ public class StaffServiceImpl implements StaffService {
         StaffEntity staff = findStaff(staffId);
         checkCanManage(findStaff(actorId), staff.getBranchId(), staff.getRole());
 
-        staff.setStatus(StaffStatus.RESIGNED);
+        staff.setStatus(StaffStatus.LOCKED);
         staff.setUpdatedAt(LocalDateTime.now());
         staffRepository.save(staff);
         log.info("Deactivated staff: {} ({})", staff.getFullName(), staff.getCode());
@@ -134,7 +142,7 @@ public class StaffServiceImpl implements StaffService {
     @Override
     public List<StaffDetailResponse> getStaffByBranch(Integer actorId, Integer branchId) {
         branchAccessGuard.check(actorId, branchId);
-        return staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE)
+        return staffRepository.findByBranchId(branchId)
             .stream()
             .map(StaffDetailResponse::from)
             .toList();
@@ -142,11 +150,14 @@ public class StaffServiceImpl implements StaffService {
 
     @Override
     public List<StaffDetailResponse> searchStaff(String fullName) {
-        return staffRepository.findByFullNameContainingIgnoreCase(fullName)
-            .stream()
-            .filter(s -> s.getStatus() == StaffStatus.ACTIVE)
+        return staffRepository.findByFullNameContainingIgnoreCase(fullName).stream()
             .map(StaffDetailResponse::from)
             .toList();
+    }
+
+    @Override
+    public List<StaffDetailResponse> getAllStaff() {
+        return staffRepository.findAll().stream().map(StaffDetailResponse::from).toList();
     }
 
     private StaffEntity findStaff(Integer staffId) {
@@ -154,17 +165,17 @@ public class StaffServiceImpl implements StaffService {
             .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND, "Staff not found: " + staffId));
     }
 
-    // Owner manages everyone. A branch manager only manages cashiers, waiters, chefs and warehouse staff of
+    // ADMIN manages everyone. A manager only manages STAFF and CHEF accounts of
     // their own branch, so nobody can create or promote an account above their own level
     private void checkCanManage(StaffEntity actor, Integer branchId, StaffRole role) {
         if (actor.getRole() == StaffRole.ADMIN) {
             return;
         }
-        if (actor.getRole() != StaffRole.BRANCH_MANAGER || !Objects.equals(actor.getBranchId(), branchId)) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Cannot manage staff of branch " + branchId);
+        if (actor.getRole() != StaffRole.MANAGER || !Objects.equals(actor.getBranchId(), branchId)) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Không có quyền quản lý nhân viên chi nhánh này");
         }
         if (!BRANCH_MANAGED_ROLES.contains(role)) {
-            throw new AppException(ErrorCode.FORBIDDEN, "A branch manager cannot manage " + role + " accounts");
+            throw new AppException(ErrorCode.FORBIDDEN, "Quản lý chỉ được quản lý nhân viên và đầu bếp của chi nhánh mình");
         }
     }
 }

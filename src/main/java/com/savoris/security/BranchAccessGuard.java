@@ -20,11 +20,22 @@ public class BranchAccessGuard {
     private final StaffRepository staffRepository;
 
     public StaffEntity check(Integer staffId, Integer branchId) {
-        StaffEntity staff = staffRepository.findById(staffId)
-            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+        StaffEntity staff = currentUser(staffId);
         if (staff.getRole() != StaffRole.ADMIN && !Objects.equals(staff.getBranchId(), branchId)) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Staff does not belong to branch " + branchId);
+            throw new AppException(ErrorCode.FORBIDDEN, "Không có quyền truy cập chi nhánh này");
         }
         return staff;
+    }
+
+    public StaffEntity currentUser(Integer staffId) {
+        return staffRepository.findById(staffId)
+            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+    }
+
+    public StaffEntity check(StaffEntity currentUser, Integer branchId) {
+        if (currentUser.getRole() != StaffRole.ADMIN && !Objects.equals(currentUser.getBranchId(), branchId)) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Không có quyền truy cập chi nhánh này");
+        }
+        return currentUser;
     }
 }

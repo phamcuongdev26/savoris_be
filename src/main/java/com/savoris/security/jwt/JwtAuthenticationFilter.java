@@ -45,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         var staff = staffRepository.findById(staffId).orElse(null);
 
                         // Resigned staff lose access at once, even with a token that has not expired yet
-                        if (staff != null && staff.getStatus() != StaffStatus.RESIGNED) {
+                        if (staff != null && staff.getStatus() == StaffStatus.ACTIVE) {
                             // Create authentication token
                             var authority = new SimpleGrantedAuthority("ROLE_" + staff.getRole().name());
                             UsernamePasswordAuthenticationToken authentication =
@@ -82,6 +82,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
+        }
+        if (request.getCookies() != null) {
+            for (var cookie : request.getCookies()) {
+                if ("savoris_access".equals(cookie.getName())) return cookie.getValue();
+            }
         }
         return null;
     }

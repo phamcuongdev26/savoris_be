@@ -66,6 +66,9 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/auth/login",
                     "/auth/refresh",
+                    "/auth/logout",
+                    "/health",
+                    "/media/**",
                     "/public/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
@@ -95,14 +98,14 @@ public class SecurityConfig {
                     response.setStatus(401);
                     response.setContentType("application/json");
                     response.getWriter().write(
-                        "{\"code\":\"UNAUTHORIZED\",\"message\":\"Invalid or missing authentication token\"}"
+                        "{\"code\":\"UNAUTHORIZED\",\"message\":\"Vui lòng đăng nhập để tiếp tục\"}"
                     );
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setStatus(403);
                     response.setContentType("application/json");
                     response.getWriter().write(
-                        "{\"code\":\"FORBIDDEN\",\"message\":\"Access denied\"}"
+                        "{\"code\":\"FORBIDDEN\",\"message\":\"Bạn không có quyền truy cập\"}"
                     );
                 })
             );

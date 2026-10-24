@@ -63,8 +63,8 @@ public class BranchController {
         @ApiResponse(responseCode = "401", description = "Chưa xác thực",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<BranchResponse> getBranch(@PathVariable Integer branchId) {
-        BranchResponse response = branchService.getBranch(branchId);
+    public ResponseEntity<BranchResponse> getBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        BranchResponse response = branchService.getBranch(staffId, branchId);
         return ResponseEntity.ok(response);
     }
 
@@ -83,7 +83,7 @@ public class BranchController {
         @ApiResponse(responseCode = "401", description = "Chưa xác thực",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PreAuthorize(Roles.MANAGEMENT)
+    @PreAuthorize(Roles.ADMIN)
     public ResponseEntity<BranchResponse> updateBranch(
         @CurrentUser Integer staffId,
         @PathVariable Integer branchId,
@@ -123,8 +123,8 @@ public class BranchController {
         @ApiResponse(responseCode = "401", description = "Chưa xác thực",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<List<BranchResponse>> getAllBranches() {
-        List<BranchResponse> response = branchService.getAllBranches();
+    public ResponseEntity<List<BranchResponse>> getAllBranches(@CurrentUser Integer staffId) {
+        List<BranchResponse> response = branchService.getBranchesFor(staffId);
         return ResponseEntity.ok(response);
     }
 
@@ -140,9 +140,10 @@ public class BranchController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<List<BranchResponse>> searchBranches(
+        @CurrentUser Integer staffId,
         @RequestParam(name = "q") String query
     ) {
-        List<BranchResponse> response = branchService.searchBranches(query);
+        List<BranchResponse> response = branchService.searchBranches(staffId, query);
         return ResponseEntity.ok(response);
     }
 }

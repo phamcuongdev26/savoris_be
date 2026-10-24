@@ -337,7 +337,7 @@ public class OrderServiceImpl implements OrderService {
         }
         if (from != OrderItemStatus.PENDING) {
             StaffRole role = staffRepository.findById(staffId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED)).getRole();
-            if (role != StaffRole.ADMIN && role != StaffRole.BRANCH_MANAGER) {
+            if (role != StaffRole.ADMIN && role != StaffRole.MANAGER) {
                 throw new AppException(ErrorCode.FORBIDDEN, item.getItemName() + " is already being cooked: ask a manager");
             }
         }
@@ -395,7 +395,7 @@ public class OrderServiceImpl implements OrderService {
 
         StaffRole role = staffRepository.findById(staffId)
             .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED)).getRole();
-        if (role != StaffRole.ADMIN && role != StaffRole.BRANCH_MANAGER && role != StaffRole.CHEF) {
+        if (role != StaffRole.ADMIN && role != StaffRole.MANAGER && role != StaffRole.CHEF) {
             throw new AppException(ErrorCode.FORBIDDEN, "Chỉ đầu bếp hoặc quản lý mới có thể xử lý yêu cầu hủy");
         }
 

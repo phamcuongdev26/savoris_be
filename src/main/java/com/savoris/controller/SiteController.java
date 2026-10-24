@@ -16,6 +16,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +32,7 @@ public class SiteController {
 
     private final SiteConfigRepository repo;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbc;
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -83,7 +87,33 @@ public class SiteController {
     @GetMapping("/hero")
     @Operation(summary = "Lấy cấu hình hero section")
     public ResponseEntity<Object> getHero() {
-        return getConfig("hero");
+        // Pull heroImage from new CMS (site_setting) and inject into old hero config
+        String cmsHeroImage = jdbc.query(
+            "SELECT payload->>'heroImage' FROM site_setting WHERE id=1",
+            rs -> rs.next() ? rs.getString(1) : null);
+        ResponseEntity<Object> base = getConfig("hero");
+        if (cmsHeroImage == null || cmsHeroImage.isBlank()) return base;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> cfg = base.getBody() instanceof Map<?,?> m
+                ? new LinkedHashMap<>((Map<String, Object>) m)
+                : new LinkedHashMap<>();
+            cfg.putIfAbsent("type", "image");
+            cfg.putIfAbsent("overlay_opacity", 0.45);
+            cfg.putIfAbsent("badge_enabled", false);
+            cfg.putIfAbsent("badge_line1", ""); cfg.putIfAbsent("badge_line2", "");
+            cfg.putIfAbsent("description", ""); cfg.putIfAbsent("cta_text", "ĐẶT BÀN"); cfg.putIfAbsent("cta_link", "#dat-ban");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> media = cfg.get("media") instanceof List<?> l
+                ? new ArrayList<>((List<Map<String, Object>>) l) : new ArrayList<>();
+            Map<String, Object> img = new LinkedHashMap<>();
+            img.put("url", cmsHeroImage); img.put("public_id", cmsHeroImage); img.put("alt", "Hero");
+            if (media.isEmpty()) media.add(img); else media.set(0, img);
+            cfg.put("media", media);
+            return ResponseEntity.ok(cfg);
+        } catch (Exception e) {
+            return base;
+        }
     }
 
     @PutMapping("/hero")
@@ -131,6 +161,22 @@ public class SiteController {
     @GetMapping("/gallery")
     @Operation(summary = "Lấy cấu hình gallery")
     public ResponseEntity<Object> getGallery() {
+        // Prefer gallery_image table (managed by new CMS); fall back to site_config
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, image_url, alt, sort_order FROM gallery_image WHERE visible=true ORDER BY sort_order, id");
+        if (!rows.isEmpty()) {
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (Map<String, Object> r : rows) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", r.get("id"));
+                item.put("image_url", r.get("image_url"));
+                item.put("public_id", r.getOrDefault("image_url", ""));
+                item.put("caption", r.getOrDefault("alt", ""));
+                item.put("order", r.get("sort_order"));
+                items.add(item);
+            }
+            return ResponseEntity.ok(items);
+        }
         return getConfig("gallery");
     }
 

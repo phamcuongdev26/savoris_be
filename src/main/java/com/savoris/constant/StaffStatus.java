@@ -1,5 +1,5 @@
 package com.savoris.constant;
 
 public enum StaffStatus {
-    ACTIVE, ON_LEAVE, RESIGNED
+    ACTIVE, LOCKED, ON_LEAVE, RESIGNED
 }

@@ -20,6 +20,7 @@ public class BranchResponse {
     private String address;
     private String city;
     private String phone;
+    private String email;
     private Double latitude;
     private Double longitude;
     private LocalDateTime openTime;
@@ -38,6 +39,7 @@ public class BranchResponse {
         response.setAddress(entity.getAddress());
         response.setCity(entity.getCity());
         response.setPhone(entity.getPhone());
+        response.setEmail(entity.getEmail());
         response.setLatitude(entity.getLatitude());
         response.setLongitude(entity.getLongitude());
         response.setOpenTime(entity.getOpenTime());

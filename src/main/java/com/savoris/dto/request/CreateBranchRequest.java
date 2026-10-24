@@ -32,6 +32,9 @@ public class CreateBranchRequest {
     @Pattern(regexp = "^[0-9\\-+\\s()]+$", message = "Phone number is invalid")
     private String phone;
 
+    @jakarta.validation.constraints.Email
+    private String email;
+
     @DecimalMin(value = "-90", message = "Latitude must be between -90 and 90")
     @DecimalMax(value = "90", message = "Latitude must be between -90 and 90")
     private Double latitude;

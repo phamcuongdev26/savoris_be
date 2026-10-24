@@ -35,6 +35,9 @@ public class BranchEntity {
     @Column(length = 20)
     private String phone;
 
+    @Column(unique = true)
+    private String email;
+
     // Map position, used to show guests the nearest branch; null until the owner sets it
     @Column
     private Double latitude;

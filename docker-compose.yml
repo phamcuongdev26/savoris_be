@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: savoris-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-savoris}
+      POSTGRES_USER: ${POSTGRES_USER:-savoris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-savoris123}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - savoris-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  savoris-postgres-data:

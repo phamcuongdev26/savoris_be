@@ -38,8 +38,12 @@ public class CreateStaffRequest {
     @NotNull(message = "Role is required")
     private StaffRole role;
 
-    @NotNull(message = "Branch ID is required")
     private Integer branchId;
+
+    @jakarta.validation.constraints.AssertTrue(message = "ADMIN không thuộc chi nhánh; các vai trò khác bắt buộc chọn chi nhánh")
+    public boolean isBranchAssignmentValid() {
+        return role == null || (role == StaffRole.ADMIN ? branchId == null : branchId != null);
+    }
 
     @NotNull(message = "Hourly rate is required")
     @DecimalMin("0")

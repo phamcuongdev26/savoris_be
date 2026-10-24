@@ -18,11 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Starting point of an empty database: the 4 branches of the chain (CN01–CN04, renamed later from the owner
- * screen) and one login per role so the first people can sign in. No menu, tables, stock, customers or
- * promotions are created: that is real data the chain enters itself.
- *
- * Accounts (all with savoris.bootstrap.password): admin (whole chain); quanly, phucvu, daubep, kho (CN01).
+ * Dev bootstrap identities for the four Savoris branches.
  */
 @Slf4j
 @Component
@@ -42,36 +38,46 @@ public class BootstrapDataSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (branchRepository.count() == 0) {
-            for (int i = 1; i <= BRANCHES; i++) {
-                BranchEntity branch = new BranchEntity();
-                branch.setCode("CN%02d".formatted(i));
-                branch.setName("Chi nhánh %02d".formatted(i));
-                branch.setAddress("Chưa cập nhật");
-                branch.setCity("Chưa cập nhật");
-                branch.setStatus(BranchStatus.ACTIVE);
-                branchRepository.save(branch);
+        for (int i = 1; i <= BRANCHES; i++) {
+            String code = "CN%02d".formatted(i);
+            String district = switch (i) { case 1 -> "Hoàn Kiếm"; case 2 -> "Cầu Giấy"; case 3 -> "Tây Hồ"; default -> "Long Biên"; };
+            BranchEntity branch = branchRepository.findByCode(code).orElseGet(() -> {
+                BranchEntity created = new BranchEntity();
+                created.setCode(code);
+                created.setAddress(district);
+                created.setCity("Hà Nội");
+                created.setStatus(BranchStatus.ACTIVE);
+                return created;
+            });
+            if (branch.getName() == null || branch.getName().startsWith("Chi nhánh ")) {
+                branch.setName("CN%d %s".formatted(i, district));
             }
-            log.info("Created branches CN01–CN{}", "%02d".formatted(BRANCHES));
+            if (branch.getAddress() == null || branch.getAddress().equals("Chưa cập nhật")) branch.setAddress(district);
+            if (branch.getCity() == null || branch.getCity().equals("Chưa cập nhật")) branch.setCity("Hà Nội");
+            branch = branchRepository.save(branch);
         }
+        log.info("Ensured branches CN01–CN04");
 
-        if (staffRepository.count() == 0) {
-            Integer firstBranch = branchRepository.findByCode("CN01").map(BranchEntity::getId).orElseThrow();
-            String hash = passwordEncoder.encode(password);
-            account("admin", "Quản trị chuỗi", StaffRole.ADMIN, null, hash);
-            account("quanly", "Quản lý CN01", StaffRole.BRANCH_MANAGER, firstBranch, hash);
-            account("phucvu", "Phục vụ CN01", StaffRole.WAITER, firstBranch, hash);
-            account("daubep", "Đầu bếp CN01", StaffRole.CHEF, firstBranch, hash);
-            account("kho", "Kho CN01", StaffRole.WAREHOUSE, firstBranch, hash);
-            log.info("Created role accounts admin, quanly, phucvu, daubep, kho");
+        String hash = passwordEncoder.encode(password);
+        account("admin", "Quản trị hệ thống", StaffRole.ADMIN, null, hash);
+        for (int i = 1; i <= BRANCHES; i++) {
+            String code = "CN%02d".formatted(i);
+            Integer branchId = branchRepository.findByCode(code).map(BranchEntity::getId).orElseThrow();
+            account("manager.cn%02d".formatted(i), "Quản lý " + code, StaffRole.MANAGER, branchId, hash);
+            account("staff1.cn%02d".formatted(i), "Nhân viên 1 " + code, StaffRole.STAFF, branchId, hash);
+            account("staff2.cn%02d".formatted(i), "Nhân viên 2 " + code, StaffRole.STAFF, branchId, hash);
+            account("chef.cn%02d".formatted(i), "Đầu bếp " + code, StaffRole.CHEF, branchId, hash);
         }
+        log.info("Ensured development accounts for all four branches");
     }
 
     private void account(String username, String fullName, StaffRole role, Integer branchId, String passwordHash) {
+        if (staffRepository.findByUsername(username).isPresent()) return;
         StaffEntity staff = new StaffEntity();
         staff.setCode(username.toUpperCase());
         staff.setUsername(username);
         staff.setFullName(fullName);
+        staff.setEmail(username + "@savoris.local");
         staff.setPasswordHash(passwordHash);
         staff.setRole(role);
         staff.setStatus(StaffStatus.ACTIVE);

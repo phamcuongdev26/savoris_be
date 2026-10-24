@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "staffs", indexes = @Index(columnList = "branch_id, role"))
+@Table(name = "app_user", indexes = @Index(columnList = "branch_id, role"))
 @Getter
 @Setter
 @NoArgsConstructor

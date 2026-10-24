@@ -50,8 +50,8 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        // 2. Check if staff is resigned
-        if (staff.getStatus() == StaffStatus.RESIGNED) {
+        // 2. Locked and inactive accounts cannot sign in.
+        if (staff.getStatus() != StaffStatus.ACTIVE) {
             throw new AppException(ErrorCode.ACCOUNT_RESIGNED);
         }
 
@@ -105,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
         StaffEntity staff = staffRepository.findById(staffId)
             .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
 
-        if (staff.getStatus() == StaffStatus.RESIGNED) {
+        if (staff.getStatus() != StaffStatus.ACTIVE) {
             throw new AppException(ErrorCode.ACCOUNT_RESIGNED);
         }
 

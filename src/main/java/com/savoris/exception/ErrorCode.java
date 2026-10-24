@@ -5,13 +5,13 @@ import lombok.Getter;
 @Getter
 public enum ErrorCode {
     // Auth errors
-    UNAUTHORIZED("UNAUTHORIZED", "Invalid or missing authentication token", 401),
-    FORBIDDEN("FORBIDDEN", "Access denied", 403),
-    INVALID_CREDENTIALS("INVALID_CREDENTIALS", "Invalid username or password", 401),
-    ACCOUNT_RESIGNED("ACCOUNT_RESIGNED", "Staff has resigned", 403),
-    INVALID_TOKEN("INVALID_TOKEN", "Invalid or expired token", 401),
-    REFRESH_TOKEN_REVOKED("REFRESH_TOKEN_REVOKED", "Refresh token has been revoked", 401),
-    TOO_MANY_LOGIN_ATTEMPTS("TOO_MANY_LOGIN_ATTEMPTS", "Too many failed logins, try again later", 429),
+    UNAUTHORIZED("UNAUTHORIZED", "Vui lòng đăng nhập để tiếp tục", 401),
+    FORBIDDEN("FORBIDDEN", "Bạn không có quyền truy cập", 403),
+    INVALID_CREDENTIALS("INVALID_CREDENTIALS", "Tên đăng nhập hoặc mật khẩu không đúng", 401),
+    ACCOUNT_RESIGNED("ACCOUNT_RESIGNED", "Tài khoản đã bị khóa hoặc ngừng hoạt động", 403),
+    INVALID_TOKEN("INVALID_TOKEN", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", 401),
+    REFRESH_TOKEN_REVOKED("REFRESH_TOKEN_REVOKED", "Phiên đăng nhập đã bị thu hồi", 401),
+    TOO_MANY_LOGIN_ATTEMPTS("TOO_MANY_LOGIN_ATTEMPTS", "Bạn đăng nhập sai quá nhiều lần, vui lòng thử lại sau", 429),
 
     // Validation errors
     VALIDATION_ERROR("VALIDATION_ERROR", "Validation failed", 400),

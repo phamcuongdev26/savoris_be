@@ -31,7 +31,7 @@ public class BranchServiceImpl implements BranchService {
     public BranchResponse createBranch(CreateBranchRequest request) {
         // Check if code already exists
         if (branchRepository.findByCode(request.getCode()).isPresent()) {
-            throw new AppException(ErrorCode.DUPLICATE_CODE, "Branch code already exists: " + request.getCode());
+            throw new AppException(ErrorCode.DUPLICATE_CODE, "Mã chi nhánh đã tồn tại");
         }
 
         BranchEntity branch = BranchEntity.builder()
@@ -40,6 +40,7 @@ public class BranchServiceImpl implements BranchService {
             .address(request.getAddress())
             .city(request.getCity())
             .phone(request.getPhone())
+            .email(request.getEmail())
             .latitude(request.getLatitude())
             .longitude(request.getLongitude())
             .openTime(request.getOpenTime())
@@ -61,10 +62,17 @@ public class BranchServiceImpl implements BranchService {
         return BranchResponse.from(branch);
     }
 
+    public BranchResponse getBranch(Integer staffId, Integer branchId) {
+        branchAccessGuard.check(staffId, branchId);
+        return getBranch(branchId);
+    }
+
     @Override
     @Transactional
     public BranchResponse updateBranch(Integer staffId, Integer branchId, UpdateBranchRequest request) {
-        branchAccessGuard.check(staffId, branchId);
+        if (branchAccessGuard.check(staffId, branchId).getRole() != com.savoris.constant.StaffRole.ADMIN) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Chỉ ADMIN được sửa thông tin chi nhánh");
+        }
         BranchEntity branch = branchRepository.findById(branchId)
             .orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND, "Branch not found: " + branchId));
 
@@ -72,6 +80,7 @@ public class BranchServiceImpl implements BranchService {
         branch.setAddress(request.getAddress());
         branch.setCity(request.getCity());
         branch.setPhone(request.getPhone());
+        branch.setEmail(request.getEmail());
         branch.setLatitude(request.getLatitude());
         branch.setLongitude(request.getLongitude());
         branch.setOpenTime(request.getOpenTime());
@@ -107,12 +116,28 @@ public class BranchServiceImpl implements BranchService {
             .toList();
     }
 
+    public List<BranchResponse> getBranchesFor(Integer staffId) {
+        var user = branchAccessGuard.currentUser(staffId);
+        if (user.getRole() == com.savoris.constant.StaffRole.ADMIN) return getAllBranches();
+        return List.of(getBranch(user.getBranchId()));
+    }
+
     @Override
     public List<BranchResponse> searchBranches(String name) {
         return branchRepository.findByNameContainingIgnoreCase(name)
             .stream()
             .filter(b -> b.getStatus() == BranchStatus.ACTIVE)
             .map(BranchResponse::from)
+            .toList();
+    }
+
+    @Override
+    public List<BranchResponse> searchBranches(Integer staffId, String name) {
+        var user = branchAccessGuard.currentUser(staffId);
+        if (user.getRole() == com.savoris.constant.StaffRole.ADMIN) return searchBranches(name);
+        branchAccessGuard.check(user, user.getBranchId());
+        return searchBranches(name).stream()
+            .filter(branch -> branch.getId().equals(user.getBranchId()))
             .toList();
     }
 }

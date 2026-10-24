@@ -34,6 +34,13 @@ public class StaffController {
     private final StaffService staffService;
     private final AuditLogger auditLogger;
 
+    @GetMapping
+    @PreAuthorize(Roles.ADMIN)
+    @Operation(summary = "Danh sách toàn bộ tài khoản nhân viên (ADMIN)")
+    public ResponseEntity<List<StaffDetailResponse>> getAllStaff() {
+        return ResponseEntity.ok(staffService.getAllStaff());
+    }
+
     @PostMapping
     @Operation(summary = "Tạo nhân viên mới")
     @SecurityRequirement(name = "bearerAuth")
