@@ -96,14 +96,14 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(401);
-                    response.setContentType("application/json");
+                    response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(
                         "{\"code\":\"UNAUTHORIZED\",\"message\":\"Vui lòng đăng nhập để tiếp tục\"}"
                     );
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setStatus(403);
-                    response.setContentType("application/json");
+                    response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(
                         "{\"code\":\"FORBIDDEN\",\"message\":\"Bạn không có quyền truy cập\"}"
                     );

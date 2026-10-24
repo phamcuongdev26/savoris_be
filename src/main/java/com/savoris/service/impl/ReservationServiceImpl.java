@@ -141,7 +141,7 @@ public class ReservationServiceImpl implements ReservationService {
         List<LocalDateTime> slots = generateSlots(branchId, date);
 
         List<SlotAvailabilityResponse> result = new ArrayList<>();
-        LocalDateTime firstAvailableAfterFull = null;
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
         for (LocalDateTime slot : slots) {
             LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
@@ -150,8 +150,7 @@ public class ReservationServiceImpl implements ReservationService {
                     List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
                 .stream().mapToInt(ReservationEntity::getGuestCount).sum();
 
-            boolean available = booked < MAX_GUESTS_SLOT;
-            if (available && firstAvailableAfterFull == null) firstAvailableAfterFull = null; // reset on next full
+            boolean available = booked < MAX_GUESTS_SLOT && slot.isAfter(now);
 
             result.add(SlotAvailabilityResponse.builder()
                 .slotTime(slot)
@@ -182,12 +181,11 @@ public class ReservationServiceImpl implements ReservationService {
             "select opens_at, closes_at from opening_hour where branch_id=? and weekday=? and closed=false and opens_at is not null and closes_at is not null",
             (rs, row) -> new LocalTime[]{rs.getObject("opens_at", LocalTime.class), rs.getObject("closes_at", LocalTime.class)},
             branchId, weekday);
-        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
         for (LocalTime[] window : windows) {
             LocalTime cursor = window[0].withSecond(0).withNano(0);
             while (cursor.isBefore(window[1])) {
                 LocalDateTime slot = date.atTime(cursor);
-                if (slot.isAfter(now) && !slot.plusMinutes(SLOT_MINUTES).toLocalTime().isAfter(window[1])) slots.add(slot);
+                if (!slot.plusMinutes(SLOT_MINUTES).toLocalTime().isAfter(window[1])) slots.add(slot);
                 cursor = cursor.plusMinutes(SLOT_MINUTES);
             }
         }
