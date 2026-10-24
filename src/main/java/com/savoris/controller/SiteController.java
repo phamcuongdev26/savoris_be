@@ -87,12 +87,22 @@ public class SiteController {
     @GetMapping("/hero")
     @Operation(summary = "Lấy cấu hình hero section")
     public ResponseEntity<Object> getHero() {
-        // Pull heroImage from new CMS (site_setting) and inject into old hero config
-        String cmsHeroImage = jdbc.query(
-            "SELECT payload->>'heroImage' FROM site_setting WHERE id=1",
-            rs -> rs.next() ? rs.getString(1) : null);
+        // Pull chain-level hero fields from the new CMS into the homepage config.
+        Map<String, String> cmsSettings = jdbc.query(
+            "SELECT payload->>'heroImage' AS hero_image, payload->>'brandLine' AS brand_line FROM site_setting WHERE id=1",
+            rs -> {
+                Map<String, String> values = new LinkedHashMap<>();
+                if (rs.next()) {
+                    values.put("heroImage", rs.getString("hero_image"));
+                    values.put("brandLine", rs.getString("brand_line"));
+                }
+                return values;
+            });
+        String cmsHeroImage = cmsSettings.get("heroImage");
+        String cmsBrandLine = cmsSettings.get("brandLine");
         ResponseEntity<Object> base = getConfig("hero");
-        if (cmsHeroImage == null || cmsHeroImage.isBlank()) return base;
+        if ((cmsHeroImage == null || cmsHeroImage.isBlank())
+                && (cmsBrandLine == null || cmsBrandLine.isBlank())) return base;
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> cfg = base.getBody() instanceof Map<?,?> m
@@ -103,13 +113,16 @@ public class SiteController {
             cfg.putIfAbsent("badge_enabled", false);
             cfg.putIfAbsent("badge_line1", ""); cfg.putIfAbsent("badge_line2", "");
             cfg.putIfAbsent("description", ""); cfg.putIfAbsent("cta_text", "ĐẶT BÀN"); cfg.putIfAbsent("cta_link", "#dat-ban");
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> media = cfg.get("media") instanceof List<?> l
-                ? new ArrayList<>((List<Map<String, Object>>) l) : new ArrayList<>();
-            Map<String, Object> img = new LinkedHashMap<>();
-            img.put("url", cmsHeroImage); img.put("public_id", cmsHeroImage); img.put("alt", "Hero");
-            if (media.isEmpty()) media.add(img); else media.set(0, img);
-            cfg.put("media", media);
+            if (cmsBrandLine != null && !cmsBrandLine.isBlank()) cfg.put("description", cmsBrandLine);
+            if (cmsHeroImage != null && !cmsHeroImage.isBlank()) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> media = cfg.get("media") instanceof List<?> l
+                    ? new ArrayList<>((List<Map<String, Object>>) l) : new ArrayList<>();
+                Map<String, Object> img = new LinkedHashMap<>();
+                img.put("url", cmsHeroImage); img.put("public_id", cmsHeroImage); img.put("alt", "Hero");
+                if (media.isEmpty()) media.add(img); else media.set(0, img);
+                cfg.put("media", media);
+            }
             return ResponseEntity.ok(cfg);
         } catch (Exception e) {
             return base;
