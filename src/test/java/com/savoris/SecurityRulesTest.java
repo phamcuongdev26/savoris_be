@@ -193,7 +193,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
 
     @Test
     void managersCanEditOwnBranchButNotOtherBranches() throws Exception {
-        String update = "{\"name\":\"Renamed\",\"address\":\"1 Long Street Ha Noi\",\"city\":\"Ha Noi\",\"phone\":\"0901234567\",\"email\":\"branch@test.com\",\"kitchenCapacity\":30}";
+        String update = "{\"name\":\"Renamed\",\"address\":\"1 Long Street Hà Nội\",\"city\":\"Hà Nội\",\"phone\":\"0901234567\",\"email\":\"branch@test.com\",\"kitchenCapacity\":30}";
         mockMvc.perform(put("/branches/" + branch.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(update))
             .andExpect(status().isOk());
         BranchEntity other = createBranch(null);
@@ -249,6 +249,39 @@ class SecurityRulesTest extends IntegrationTestSupport {
         // Someone at another address is not affected
         mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(right)
                 .with(request -> { request.setRemoteAddr("10.0.0.99"); return request; }))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void staffAndChefAreScopedToTheirOwnBranch_adminSeesAll() throws Exception {
+        BranchEntity otherBranch = createBranch(null);
+        MenuItemEntity dish = createMenuItem("Bun bo " + unique(), 60000);
+
+        // MANAGER of branch1 cannot read orders or kitchen queue of otherBranch
+        mockMvc.perform(get("/orders/branch/" + otherBranch.getId()).with(as(manager)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/kitchen/branches/" + otherBranch.getId() + "/queue").with(as(manager)))
+            .andExpect(status().isForbidden());
+
+        // STAFF of branch1 cannot read orders of otherBranch
+        mockMvc.perform(get("/orders/branch/" + otherBranch.getId()).with(as(waiter)))
+            .andExpect(status().isForbidden());
+
+        // STAFF of branch1 cannot place an order for otherBranch
+        mockMvc.perform(post("/orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+                .content(orderJson(otherBranch, "DINE_IN", table(otherBranch, 1), dish(dish, 1))))
+            .andExpect(status().isForbidden());
+
+        // CHEF of branch1 cannot see the kitchen queue of otherBranch
+        mockMvc.perform(get("/kitchen/branches/" + otherBranch.getId() + "/queue").with(as(chef)))
+            .andExpect(status().isForbidden());
+
+        // ADMIN (chain owner) can read orders and kitchen queue for any branch
+        mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(owner)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/orders/branch/" + otherBranch.getId()).with(as(owner)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + otherBranch.getId() + "/queue").with(as(owner)))
             .andExpect(status().isOk());
     }
 

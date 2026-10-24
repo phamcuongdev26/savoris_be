@@ -81,7 +81,7 @@ public abstract class IntegrationTestSupport {
         branch.setCode("T" + n);
         branch.setName("Test branch " + n);
         branch.setAddress(n + " Test street");
-        branch.setCity("Ha Noi");
+        branch.setCity("Hà Nội");
         branch.setStatus(BranchStatus.ACTIVE);
         branch.setKitchenCapacity(kitchenCapacity);
         branch = branchRepository.save(branch);
