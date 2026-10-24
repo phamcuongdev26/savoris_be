@@ -192,10 +192,10 @@ class SecurityRulesTest extends IntegrationTestSupport {
     }
 
     @Test
-    void onlyAdminCanEditBranchDetails() throws Exception {
-        String update = "{\"name\":\"Renamed\",\"address\":\"1 Street\",\"city\":\"Ha Noi\",\"kitchenCapacity\":30}";
+    void managersCanEditOwnBranchButNotOtherBranches() throws Exception {
+        String update = "{\"name\":\"Renamed\",\"address\":\"1 Long Street Ha Noi\",\"city\":\"Ha Noi\",\"phone\":\"0901234567\",\"email\":\"branch@test.com\",\"kitchenCapacity\":30}";
         mockMvc.perform(put("/branches/" + branch.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(update))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
         BranchEntity other = createBranch(null);
         mockMvc.perform(put("/branches/" + other.getId()).with(as(manager)).contentType(MediaType.APPLICATION_JSON).content(update))
             .andExpect(status().isForbidden());

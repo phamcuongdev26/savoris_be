@@ -131,7 +131,7 @@ class WebTakeawayTest extends IntegrationTestSupport {
         overrideAtBranch(branch, pho, 45000L, true);
         // The owner places the branch on the map; guests get the position to find the nearest one
         mockMvc.perform(put("/branches/" + branch.getId()).with(as(admin)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Test\",\"address\":\"12 Ly Quoc Su\",\"city\":\"Ha Noi\",\"latitude\":21.0307,\"longitude\":105.8489}"))
+                .content("{\"name\":\"Test\",\"address\":\"12 Ly Quoc Su Ha Noi\",\"city\":\"Ha Noi\",\"phone\":\"0901234567\",\"email\":\"branch@test.com\",\"latitude\":21.0307,\"longitude\":105.8489}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.latitude").value(21.0307));
         mockMvc.perform(put("/branches/" + branch.getId()).with(as(admin)).contentType(MediaType.APPLICATION_JSON)

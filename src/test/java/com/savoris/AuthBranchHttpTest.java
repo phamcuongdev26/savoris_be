@@ -292,10 +292,11 @@ class AuthBranchHttpTest {
         String validPickup = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách\",\"guestPhone\":\"0912345678\",\"payMethod\":\"CASH\",\"pickupAt\":\"" + tomorrow.atTime(15, 30) + "\",\"items\":[{\"menuItemId\":" + takeawayItemId + ",\"quantity\":1}]}";
         assertEquals(201, exchange(HttpMethod.POST, "/public/takeaway-orders", validPickup, null).statusCode());
         assertTrue(exchange(HttpMethod.GET, "/dashboard/chain", null, adminCookie).body().contains("\"openOrders\":1"));
+        // CASH takeaway waits outside the kitchen until the cashier collects payment
         String chefCookie = accessCookie(login("chef-http", "Correct@123"));
         HttpResponse<String> kitchenQueue = exchange(HttpMethod.GET, "/kitchen/branches/" + cn1.getId() + "/queue", null, chefCookie);
         assertEquals(200, kitchenQueue.statusCode());
-        assertTrue(kitchenQueue.body().contains("\"awaitingPayment\":true"));
+        assertEquals("[]", kitchenQueue.body().trim());
     }
 
     private HttpResponse<String> login(String username, String password) throws Exception {
