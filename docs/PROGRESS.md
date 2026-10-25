@@ -79,10 +79,14 @@ Xác nhận: `git log master..feature/thu-gon-pham-vi` → chỉ 2 commit trên,
 
 Các luồng chính KHÔNG mất test: gọi món (OrderFlowTest), bếp (KitchenFlowTest), thanh toán (CashPaymentTest), đặt bàn (AuthBranchHttpTest), mang về (WebTakeawayTest), giờ vàng (PeakHourTest + PeakLoadTest), phân quyền (SecurityRulesTest + AuthBranchHttpTest).
 
-### Codex review (commit f453099)
-**P1 đã áp dụng:** `doCreate()` trong ReservationServiceImpl dùng chung cho cả staff và guest — vô tình áp slot-capacity + opening-hours check lên cả staff path. Fix: thêm param `isStaff`, skip validate khi `true`.
+### Codex review (commit f453099) — fix lại tại commit d0f360d
+**P1 đã áp dụng (sửa lại):**  
+- Commit 3663954 (đã revert về): dùng `isStaff=true` để bỏ toàn bộ validation cho staff — SAI, cho đặt ngoài giờ và vào quá khứ.
+- Commit d0f360d (đúng): validate đồng nhất cho cả staff và guest; chỉ sức chứa là có thể vượt với `overrideCapacity=true`, giới hạn ADMIN/MANAGER; STAFF gửi flag → 403; ghi audit log khi vượt.
+- Lỗi phụ tìm thấy khi viết test: Jackson 3 dùng all-args constructor Lombok → `boolean` primitive không có trong JSON gây `HttpMessageNotReadableException`; fix: đổi sang `Boolean` wrapper.
+- Lỗi setUp: `delete from reservations` chạy sau `staff.deleteAll()` → FK violation; đã di chuyển.
 
-Không có góp ý nào khác.
+Codex review commit d0f360d: **"Không tìm thấy lỗi nào đáng kể."**
 
 ---
 
