@@ -163,6 +163,8 @@ public class WebsiteCmsController {
         StaffEntity staff = branchAccess.currentUser(staffId);
         Object rawBranchId = pick(body, "branchId", "branch_id");
         if (rawBranchId == null) throw new AppException(ErrorCode.INVALID_REQUEST, "branchId là bắt buộc");
+        if (rawBranchId instanceof Number n && n.doubleValue() != Math.floor(n.doubleValue()))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "branchId phải là số nguyên");
         int branchId = ((Number) rawBranchId).intValue();
         requestedBranch(branchId, staff);
 
@@ -170,9 +172,12 @@ public class WebsiteCmsController {
         List<Map<String, Object>> days = (List<Map<String, Object>>) body.get("days");
         if (days == null || days.isEmpty()) throw new AppException(ErrorCode.INVALID_REQUEST, "days là bắt buộc và không được rỗng");
 
+        Set<Integer> seenWeekdays = new java.util.HashSet<>();
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> day : days) {
             int weekday = extractWeekday(day);
+            if (!seenWeekdays.add(weekday))
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Thứ " + weekday + " bị trùng lặp trong danh sách days");
             boolean closed = Boolean.TRUE.equals(day.getOrDefault("closed", false));
             LocalTime opensAt = parseTime(pick(day, "opensAt", "opens_at"), "opensAt");
             LocalTime closesAt = parseTime(pick(day, "closesAt", "closes_at"), "closesAt");
