@@ -34,4 +34,6 @@ public class CreateReservationRequest {
     private Integer numberOfGuests;
 
     private String notes;
+
+    private Boolean overrideCapacity;
 }

@@ -75,13 +75,13 @@ class AuthBranchHttpTest {
         refreshTokens.deleteAll();
         jdbc.update("delete from audit_logs");
         jdbc.update("update branches set manager_id=null");
+        jdbc.update("delete from reservations");
         staff.deleteAll();
         jdbc.update("delete from branch_page");
         jdbc.update("delete from gallery_image");
         jdbc.update("delete from payments");
         jdbc.update("delete from order_items");
         jdbc.update("delete from orders");
-        jdbc.update("delete from reservations");
         jdbc.update("delete from branch_menu_items");
         jdbc.update("delete from code_sequences");
         jdbc.update("delete from opening_hour");
@@ -214,7 +214,7 @@ class AuthBranchHttpTest {
         assertFalse(slots.body().contains(tomorrow.atTime(16, 0).toString()));
 
         String invalid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(16, 0) + "\",\"numberOfGuests\":2}";
-        assertEquals(409, exchange(HttpMethod.POST, "/reservations/guest", invalid, null).statusCode());
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations/guest", invalid, null).statusCode());
         String valid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(15, 30) + "\",\"numberOfGuests\":2}";
         HttpResponse<String> created = exchange(HttpMethod.POST, "/reservations/guest", valid, null);
         assertEquals(201, created.statusCode());
@@ -229,6 +229,46 @@ class AuthBranchHttpTest {
         assertTrue(exchange(HttpMethod.GET,
             "/reservations/branch/" + cn1.getId() + "?date=" + tomorrow + "&status=NO_SHOW", null, adminCookie).body()
             .contains("\"id\":" + reservationId));
+    }
+
+    @Test
+    void staffReservationValidationAndCapacityOverride() throws Exception {
+        int uid = IDS.incrementAndGet();
+        StaffEntity staffUser = user("staff-res-" + uid, StaffRole.STAFF, cn1, StaffStatus.ACTIVE);
+        String staffCookie  = accessCookie(login("staff-res-" + uid, "Correct@123"));
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+
+        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1);
+        int weekday = tomorrow.getDayOfWeek().getValue();
+        // Opening window: 15:00 – 15:30 (single slot)
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'15:00','15:30',false)",
+            cn1.getId(), weekday);
+        LocalDateTime slot = tomorrow.atTime(15, 0);
+        String base = "\"branchId\":" + cn1.getId() + ",\"customerName\":\"T\",\"customerPhone\":\"0911111111\"";
+
+        // 1. Past date → 400 (Bean Validation @Future)
+        String past = "{" + base + ",\"reservationDate\":\"" + LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).minusDays(1) + "\",\"numberOfGuests\":1}";
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations", past, staffCookie).statusCode());
+
+        // 2. Outside opening hours → 400
+        String outside = "{" + base + ",\"reservationDate\":\"" + tomorrow.atTime(17, 0) + "\",\"numberOfGuests\":1}";
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations", outside, staffCookie).statusCode());
+
+        // 3. Manager fills the slot (40 guests in one booking)
+        String fillBody = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":40}";
+        assertEquals(201, exchange(HttpMethod.POST, "/reservations", fillBody, managerCookie).statusCode());
+
+        String fullSlot = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1}";
+        // 4. Staff đặt khung đầy → 409
+        assertEquals(409, exchange(HttpMethod.POST, "/reservations", fullSlot, staffCookie).statusCode());
+
+        // 5. Staff gửi overrideCapacity=true → 403
+        String staffOverride = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1,\"overrideCapacity\":true}";
+        assertEquals(403, exchange(HttpMethod.POST, "/reservations", staffOverride, staffCookie).statusCode());
+
+        // 6. Manager với overrideCapacity=true → 201
+        String managerOverride = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1,\"overrideCapacity\":true}";
+        assertEquals(201, exchange(HttpMethod.POST, "/reservations", managerOverride, managerCookie).statusCode());
     }
 
     @Test

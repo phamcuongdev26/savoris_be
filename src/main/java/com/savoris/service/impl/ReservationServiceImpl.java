@@ -1,15 +1,18 @@
 package com.savoris.service.impl;
 
 import com.savoris.constant.ReservationStatus;
+import com.savoris.constant.StaffRole;
 import com.savoris.dto.request.CreateReservationRequest;
 import com.savoris.dto.request.GuestReservationRequest;
 import com.savoris.dto.response.ReservationResponse;
 import com.savoris.dto.response.SlotAvailabilityResponse;
 import com.savoris.entity.ReservationEntity;
+import com.savoris.entity.StaffEntity;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
 import com.savoris.repository.ReservationRepository;
 import com.savoris.security.BranchAccessGuard;
+import com.savoris.service.AuditLogger;
 import com.savoris.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,15 +37,24 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final BranchAccessGuard branchAccessGuard;
+    private final AuditLogger auditLogger;
     private final JdbcTemplate jdbc;
 
     @Override
     @Transactional
     public ReservationResponse createReservation(Integer staffId, CreateReservationRequest request) {
-        branchAccessGuard.check(staffId, request.getBranchId());
+        StaffEntity staff = branchAccessGuard.check(staffId, request.getBranchId());
+        boolean override = Boolean.TRUE.equals(request.getOverrideCapacity());
+        if (override) {
+            StaffRole role = staff.getRole();
+            if (role != StaffRole.ADMIN && role != StaffRole.MANAGER) {
+                throw new AppException(ErrorCode.FORBIDDEN, "Chỉ MANAGER hoặc ADMIN mới có thể vượt sức chứa khung giờ");
+            }
+        }
         return ReservationResponse.from(doCreate(
             request.getBranchId(), request.getCustomerName(), request.getCustomerPhone(),
-            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), staffId, true));
+            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), staffId,
+            override));
     }
 
     @Override
@@ -54,15 +66,16 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     private ReservationEntity doCreate(Integer branchId, String customerName, String customerPhone,
-            int guestCount, LocalDateTime reservationDate, String notes, Integer createdBy, boolean isStaff) {
+            int guestCount, LocalDateTime reservationDate, String notes, Integer createdBy, boolean overrideCapacity) {
         LocalDateTime slot = reservationDate.withSecond(0).withNano(0);
-        if (!isStaff) validateOpeningHours(branchId, slot);
+        validateOpeningHours(branchId, slot);
         LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
         int booked = reservationRepository
             .findByBranchIdAndReservedAtBetweenAndStatusNotIn(branchId, slot, slotEnd,
                 List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
             .stream().mapToInt(ReservationEntity::getGuestCount).sum();
-        if (!isStaff && booked + guestCount > MAX_GUESTS_SLOT) {
+        boolean overflow = booked + guestCount > MAX_GUESTS_SLOT;
+        if (overflow && !overrideCapacity) {
             throw new AppException(ErrorCode.INVALID_STATE,
                 "Khung giờ " + slot.toLocalTime() + " đã hết chỗ. Vui lòng chọn khung khác.");
         }
@@ -76,6 +89,10 @@ public class ReservationServiceImpl implements ReservationService {
         entity.setStatus(ReservationStatus.PENDING);
         entity.setCreatedBy(createdBy);
         ReservationEntity saved = reservationRepository.save(entity);
+        if (overflow) {
+            auditLogger.log(createdBy, branchId, "CAPACITY_OVERRIDE", "RESERVATION", saved.getId(),
+                null, "{\"booked\":" + booked + ",\"added\":" + guestCount + ",\"max\":" + MAX_GUESTS_SLOT + "}");
+        }
         log.info("Reservation {} for branch {} at {}", saved.getId(), branchId, slot);
         return saved;
     }
@@ -197,7 +214,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private void validateOpeningHours(Integer branchId, LocalDateTime slot) {
         if (slot.getSecond() != 0 || slot.getNano() != 0 || slot.getMinute() % SLOT_MINUTES != 0) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Vui lòng chọn giờ theo khung 30 phút");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng chọn giờ theo khung 30 phút");
         }
         int weekday = slot.getDayOfWeek().getValue();
         List<LocalTime[]> windows = jdbc.query(
@@ -208,7 +225,7 @@ public class ReservationServiceImpl implements ReservationService {
         boolean inHours = windows.stream().anyMatch(window -> !time.isBefore(window[0])
             && !time.plusMinutes(SLOT_MINUTES).isAfter(window[1]));
         if (!slot.isAfter(LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))) || !inHours) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Giờ đặt bàn nằm ngoài giờ hoạt động của chi nhánh");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Giờ đặt bàn nằm ngoài giờ hoạt động của chi nhánh");
         }
     }
 
