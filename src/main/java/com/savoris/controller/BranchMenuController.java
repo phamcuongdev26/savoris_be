@@ -41,7 +41,7 @@ public class BranchMenuController {
     }
 
     @PutMapping("/{menuItemId}/availability")
-    @PreAuthorize(Roles.SERVICE)
+    @PreAuthorize(Roles.KITCHEN)
     @Operation(summary = "Báo hết món / bán lại", description = "{\"available\": false} = hết món; đơn mới gọi món này bị từ chối")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BranchMenuItemResponse> setAvailability(@CurrentUser Integer staffId, @PathVariable Integer branchId,
