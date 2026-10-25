@@ -1,14 +1,9 @@
 package com.savoris;
 
-import com.savoris.constant.DiscountType;
 import com.savoris.constant.StaffRole;
 import com.savoris.entity.BranchEntity;
-import com.savoris.entity.CustomerEntity;
 import com.savoris.entity.MenuItemEntity;
-import com.savoris.entity.PromotionEntity;
 import com.savoris.entity.StaffEntity;
-import com.savoris.repository.CustomerRepository;
-import com.savoris.repository.PromotionRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,8 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,8 +23,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
 
-    @Autowired PromotionRepository promotionRepository;
-    @Autowired CustomerRepository customerRepository;
     @Autowired PasswordEncoder passwordEncoder;
 
     private BranchEntity branch;
@@ -141,46 +132,6 @@ class OrderEditingMenuPasswordTest extends IntegrationTestSupport {
         // A dish of another order
         mockMvc.perform(put("/orders/" + orderId + "/items/" + servedItem + "/cancel").with(as(manager)))
             .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void droppingDishesBelowThePromotionMinimum_removesThePromotion_andReturnsExtraPoints() throws Exception {
-        PromotionEntity promotion = new PromotionEntity();
-        promotion.setCode("MIN100_" + unique());
-        promotion.setName("Min 100k");
-        promotion.setDiscountType(DiscountType.FIXED_AMOUNT);
-        promotion.setDiscountValue(BigDecimal.valueOf(10000));
-        promotion.setMinOrderAmount(BigDecimal.valueOf(100000));
-        promotion.setStartAt(LocalDateTime.now().minusHours(1));
-        promotion.setEndAt(LocalDateTime.now().plusDays(1));
-        promotion.setUsedCount(0);
-        promotion.setIsActive(true);
-        promotion = promotionRepository.save(promotion);
-        CustomerEntity customer = new CustomerEntity();
-        customer.setPhone("0966" + unique());
-        customer.setPoints(80);
-        customer = customerRepository.save(customer);
-
-        // 2 x 50.000 = 100.000 - 10.000 promo - 80 points (80.000) = 10.000
-        String created = createOrder("{\"branchId\":" + branch.getId() + ",\"orderType\":\"TAKEAWAY\",\"customerId\":" + customer.getId()
-            + ",\"promotionCode\":\"" + promotion.getCode() + "\",\"pointsToUse\":80,\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}");
-        assertThat((Integer) JsonPath.read(created, "$.totalAmount")).isEqualTo(10000);
-        int orderId = JsonPath.read(created, "$.id");
-
-        // Customer changes their mind: one bowl instead of two -> 50.000, promo no longer applies, at most 50 points fit
-        int phoItem = JsonPath.read(created, "$.items[0].id");
-        mockMvc.perform(put("/orders/" + orderId + "/items/" + phoItem + "/cancel").with(as(cashier)))
-            .andExpect(status().isOk());
-        mockMvc.perform(post("/orders/" + orderId + "/items").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
-                .content(addJson(pho, 1)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.subtotal").value(50000))
-            .andExpect(jsonPath("$.discountAmount").value(0))
-            .andExpect(jsonPath("$.pointsUsed").value(0))
-            .andExpect(jsonPath("$.totalAmount").value(50000));
-
-        assertThat(promotionRepository.findById(promotion.getId()).orElseThrow().getUsedCount()).isZero();
-        assertThat(customerRepository.findById(customer.getId()).orElseThrow().getPoints()).isEqualTo(80);
     }
 
     // ---------------------------------------------------------------- branch menu

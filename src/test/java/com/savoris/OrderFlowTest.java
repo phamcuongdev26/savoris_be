@@ -107,12 +107,6 @@ class OrderFlowTest extends IntegrationTestSupport {
                 .content(orderJson(branch, "TAKEAWAY", null, new int[]{999999, 1})))
             .andExpect(status().isConflict());
 
-        // Unknown customer
-        mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"branchId\":" + branch.getId() + ",\"orderType\":\"TAKEAWAY\",\"customerId\":999999,"
-                    + "\"items\":[{\"menuItemId\":" + tea.getId() + ",\"quantity\":1}]}"))
-            .andExpect(status().isNotFound());
-
         // Unknown order
         mockMvc.perform(get("/orders/999999").with(as(cashier)))
             .andExpect(status().isNotFound());

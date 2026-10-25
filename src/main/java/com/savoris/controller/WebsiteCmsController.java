@@ -26,8 +26,7 @@ public class WebsiteCmsController {
     private final BranchAccessGuard branchAccess;
 
     private static final Map<String, String> TABLES = Map.of(
-        "offers", "offer", "gallery", "gallery_image", "accolades", "accolade",
-        "testimonials", "testimonial", "menus", "menu_file", "hours", "opening_hour"
+        "gallery", "gallery_image", "hours", "opening_hour"
     );
 
     @GetMapping("/public/site")
@@ -36,10 +35,6 @@ public class WebsiteCmsController {
         result.put("settings", singleton("site_setting"));
         result.put("branches", jdbc.queryForList("select id, code, name, slug, address, city, phone, email, latitude, longitude from branches where status='ACTIVE' order by id"));
         result.put("gallery", publicRows("gallery_image", null));
-        result.put("offers", publicRows("offer", null));
-        result.put("accolades", publicRows("accolade", null));
-        result.put("testimonials", publicRows("testimonial", null));
-        result.put("menus", publicRows("menu_file", null));
         return result;
     }
 
@@ -57,11 +52,7 @@ public class WebsiteCmsController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("branch", branch);
         result.put("page", page);
-        result.put("offers", publicRows("offer", id));
         result.put("gallery", publicRows("gallery_image", id));
-        result.put("accolades", publicRows("accolade", id));
-        result.put("testimonials", publicRows("testimonial", id));
-        result.put("menus", publicRows("menu_file", id));
         result.put("openingHours", jdbc.queryForList("select weekday, opens_at, closes_at, closed from opening_hour where branch_id=? order by weekday", id));
         return result;
     }
@@ -118,7 +109,6 @@ public class WebsiteCmsController {
             requestedBranch(branchId(payload), staff);
             payload.put("branchId", staff.getBranchId());
         }
-        validatePrice(resource, payload);
         Map<String, Object> saved = persist(table, null, payload);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
@@ -134,7 +124,6 @@ public class WebsiteCmsController {
             requestedBranch(branchId(payload), staff);
             payload.put("branchId", staff.getBranchId());
         }
-        validatePrice(resource, payload);
         return persist(table, id, payload);
     }
 
@@ -158,14 +147,6 @@ public class WebsiteCmsController {
         return ResponseEntity.noContent().build();
     }
 
-    private void validatePrice(String resource, Map<String, Object> payload) {
-        if ("offers".equals(resource) && payload.get("price") instanceof Number n && n.longValue() < 0)
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Giá ưu đãi không được âm");
-        if ("testimonials".equals(resource) && !Boolean.FALSE.equals(payload.get("visible"))
-                && (payload.get("source") == null || payload.get("source").toString().isBlank()))
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Đánh giá công khai cần có nguồn");
-    }
-
     private String table(String resource) {
         String value = TABLES.get(resource);
         if (value == null) throw new AppException(ErrorCode.NOT_FOUND, "Không tìm thấy mục CMS");
@@ -175,22 +156,9 @@ public class WebsiteCmsController {
     private Map<String, Object> persist(String table, Long id, Map<String, Object> p) {
         String sql;
         Object[] args;
-        if ("offer".equals(table)) {
-            sql = id == null ? "insert into offer(branch_id,title,description,price,unit,schedule,image_url,image_alt,menu_url,sort_order,visible) values(?,?,?,?,?,?,?,?,?,?,?) returning id"
-                : "update offer set branch_id=?,title=?,description=?,price=?,unit=?,schedule=?,image_url=?,image_alt=?,menu_url=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("title"), p.getOrDefault("description", ""), p.get("price"), p.getOrDefault("unit", "người"), p.getOrDefault("schedule", ""), pick(p, "imageUrl", "image_url"), pick(p, "imageAlt", "image_alt", "alt"), pick(p, "menuUrl", "menu_url"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
-        } else if ("gallery_image".equals(table)) {
+        if ("gallery_image".equals(table)) {
             sql = id == null ? "insert into gallery_image(branch_id,image_url,alt,sort_order,visible) values(?,?,?,?,?) returning id" : "update gallery_image set branch_id=?,image_url=?,alt=?,sort_order=?,visible=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), pick(p, "imageUrl", "image_url"), p.get("alt"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
-        } else if ("accolade".equals(table)) {
-            sql = id == null ? "insert into accolade(branch_id,award_year,content,sort_order,visible) values(?,?,?,?,?) returning id" : "update accolade set branch_id=?,award_year=?,content=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), pick(p, "year", "award_year"), p.get("content"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
-        } else if ("testimonial".equals(table)) {
-            sql = id == null ? "insert into testimonial(branch_id,quote,reviewer,title,source,sort_order,visible) values(?,?,?,?,?,?,?) returning id" : "update testimonial set branch_id=?,quote=?,reviewer=?,title=?,source=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("quote"), p.get("reviewer"), p.getOrDefault("title", ""), p.getOrDefault("source", ""), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
-        } else if ("menu_file".equals(table)) {
-            sql = id == null ? "insert into menu_file(branch_id,title,file_url,image_url,sort_order,visible) values(?,?,?,?,?,?) returning id" : "update menu_file set branch_id=?,title=?,file_url=?,image_url=?,sort_order=?,visible=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("title"), pick(p, "fileUrl", "file_url"), pick(p, "imageUrl", "image_url"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else {
             sql = id == null ? "insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,?,?,?) returning id" : "update opening_hour set branch_id=?,weekday=?,opens_at=?,closes_at=?,closed=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), p.get("weekday"), pick(p, "opensAt", "opens_at"), pick(p, "closesAt", "closes_at"), p.getOrDefault("closed", false)};

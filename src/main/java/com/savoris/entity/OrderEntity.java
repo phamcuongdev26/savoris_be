@@ -44,9 +44,6 @@ public class OrderEntity {
     @Column(name = "reservation_id")
     private Integer reservationId;
 
-    @Column(name = "customer_id")
-    private Integer customerId;
-
     @Column(name = "guest_count")
     private Integer guestCount;
 
@@ -65,15 +62,6 @@ public class OrderEntity {
 
     @Column(nullable = false, precision = 14, scale = 0)
     private BigDecimal subtotal = BigDecimal.ZERO;
-
-    @Column(name = "promotion_id")
-    private Integer promotionId;
-
-    @Column(name = "discount_amount", nullable = false, precision = 14, scale = 0)
-    private BigDecimal discountAmount = BigDecimal.ZERO;
-
-    @Column(name = "points_used", nullable = false)
-    private Integer pointsUsed = 0;
 
     @Column(name = "vat_amount", nullable = false, precision = 14, scale = 0)
     private BigDecimal vatAmount = BigDecimal.ZERO;

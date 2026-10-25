@@ -28,5 +28,4 @@ public interface OrderService {
     // Cancelled transfer orders the counter still has to pay back
     List<OrderResponse> getRefundsDue(Integer staffId, Integer branchId);
     OrderResponse settleRefund(Integer staffId, Integer orderId);
-    List<OrderResponse> getOrdersByCustomer(Integer staffId, Integer customerId);
 }

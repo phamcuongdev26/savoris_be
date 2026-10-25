@@ -36,7 +36,6 @@ class SecurityRulesTest extends IntegrationTestSupport {
     private StaffEntity waiter;
     private StaffEntity cashier;
     private StaffEntity chef;
-    private StaffEntity warehouse;
 
     @BeforeEach
     void setUp() {
@@ -46,7 +45,6 @@ class SecurityRulesTest extends IntegrationTestSupport {
         waiter = createStaff(StaffRole.STAFF, branch);
         cashier = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        warehouse = createStaff(StaffRole.STAFF, branch);
     }
 
     private String staffJson(String role, BranchEntity at) {
@@ -100,40 +98,10 @@ class SecurityRulesTest extends IntegrationTestSupport {
                 .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
             .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(cashier)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
-            .andExpect(status().isOk());
-
         mockMvc.perform(put("/kitchen/items/1/start").with(as(manager)))
             .andExpect(status().isForbidden());
         mockMvc.perform(put("/kitchen/items/1/start").with(as(cashier)))
             .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void staffCannotManageStock_butManagerIsScopedToOwnBranch() throws Exception {
-        BranchEntity otherBranch = createBranch(null);
-
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(warehouse)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(warehouse)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
-            .andExpect(status().isOk());
-        mockMvc.perform(post("/inventory/branch/" + branch.getId() + "/import").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rows\":[{\"name\":\"Rice\",\"unit\":\"kg\",\"quantity\":10,\"minStock\":2}]}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.created").value(1));
-        mockMvc.perform(post("/inventory/branch/" + otherBranch.getId() + "/import").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rows\":[{\"name\":\"Beef\",\"unit\":\"kg\",\"quantity\":10}]}"))
-            .andExpect(status().isForbidden());
-
-        // ADMIN retains the existing all-branch stock access.
-        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(owner)))
-            .andExpect(status().isOk());
     }
 
     @Test

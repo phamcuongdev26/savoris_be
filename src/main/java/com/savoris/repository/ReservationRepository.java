@@ -13,7 +13,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     List<ReservationEntity> findByBranchIdAndStatus(Integer branchId, ReservationStatus status);
     List<ReservationEntity> findByBranchId(Integer branchId);
     List<ReservationEntity> findByReservedAtBetween(LocalDateTime start, LocalDateTime end);
-    List<ReservationEntity> findByCustomerId(Integer customerId);
+    List<ReservationEntity> findByBranchIdAndCustomerPhone(Integer branchId, String customerPhone);
 
     /** Active (non-cancelled) reservations for a branch within a time window — used for slot capacity. */
     List<ReservationEntity> findByBranchIdAndReservedAtBetweenAndStatusNot(

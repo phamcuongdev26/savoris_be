@@ -26,9 +26,6 @@ public class ReservationEntity {
     @Column(name = "branch_id", nullable = false)
     private Integer branchId;
 
-    @Column(name = "customer_id")
-    private Integer customerId;
-
     @Column(nullable = false)
     private String customerName;
 

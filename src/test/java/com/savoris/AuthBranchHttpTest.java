@@ -77,13 +77,8 @@ class AuthBranchHttpTest {
         jdbc.update("update branches set manager_id=null");
         staff.deleteAll();
         jdbc.update("delete from branch_page");
-        jdbc.update("delete from testimonial");
-        jdbc.update("delete from accolade");
         jdbc.update("delete from gallery_image");
-        jdbc.update("delete from offer");
-        jdbc.update("delete from menu_file");
         jdbc.update("delete from payments");
-        jdbc.update("delete from point_transactions");
         jdbc.update("delete from order_items");
         jdbc.update("delete from orders");
         jdbc.update("delete from reservations");

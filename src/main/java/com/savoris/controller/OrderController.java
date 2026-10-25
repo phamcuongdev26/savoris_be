@@ -85,14 +85,6 @@ public class OrderController {
         return ResponseEntity.ok(orderService.settleRefund(staffId, orderId));
     }
 
-    @GetMapping("/customer/{customerId}")
-    @Operation(summary = "Danh sách đơn hàng theo khách hàng")
-    @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.ORDER_WRITE)
-    public ResponseEntity<List<OrderResponse>> getOrdersByCustomer(@CurrentUser Integer staffId, @PathVariable Integer customerId) {
-        return ResponseEntity.ok(orderService.getOrdersByCustomer(staffId, customerId));
-    }
-
     @PostMapping("/{orderId}/items")
     @PreAuthorize(Roles.ORDER_WRITE)
     @Operation(summary = "Gọi thêm món", description = "Thêm món vào đơn đang mở (chưa thanh toán); tổng tiền, khuyến mãi, VAT được tính lại")

@@ -15,7 +15,7 @@ public interface ReservationService {
     ReservationResponse cancelReservation(Integer staffId, Integer reservationId);
     ReservationResponse markNoShow(Integer staffId, Integer reservationId);
     List<ReservationResponse> getReservationsByBranch(Integer staffId, Integer branchId);
-    List<ReservationResponse> getReservationsByCustomer(Integer customerId);
+    List<ReservationResponse> searchByPhone(Integer staffId, Integer branchId, String phone);
 
     /** Public: available time slots for a given branch + date. */
     List<SlotAvailabilityResponse> getAvailableSlots(Integer branchId, LocalDate date);

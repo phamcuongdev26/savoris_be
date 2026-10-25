@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 public class ReservationResponse {
     private Integer id;
     private Integer branchId;
-    private Integer customerId;
     private String customerName;
     private String customerPhone;
     private Integer tableId;
@@ -31,7 +30,6 @@ public class ReservationResponse {
         ReservationResponse response = new ReservationResponse();
         response.setId(entity.getId());
         response.setBranchId(entity.getBranchId());
-        response.setCustomerId(entity.getCustomerId());
         response.setCustomerName(entity.getCustomerName());
         response.setCustomerPhone(entity.getCustomerPhone());
         response.setTableId(entity.getTableId());

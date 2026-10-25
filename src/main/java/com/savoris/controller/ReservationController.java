@@ -74,7 +74,11 @@ public class ReservationController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<ReservationResponse>> getByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) com.savoris.constant.ReservationStatus status) {
+            @RequestParam(required = false) com.savoris.constant.ReservationStatus status,
+            @RequestParam(required = false) String phone) {
+        if (phone != null && !phone.isBlank()) {
+            return ResponseEntity.ok(reservationService.searchByPhone(staffId, branchId, phone));
+        }
         LocalDate selectedDate = date == null ? LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")) : date;
         LocalDateTime start = selectedDate.atStartOfDay();
         LocalDateTime end = selectedDate.plusDays(1).atStartOfDay();
@@ -82,14 +86,6 @@ public class ReservationController {
             .filter(r -> r.getReservationDate() != null && !r.getReservationDate().isBefore(start) && r.getReservationDate().isBefore(end))
             .filter(r -> status == null || r.getStatus() == status)
             .toList());
-    }
-
-    @GetMapping("/customer/{customerId}")
-    @Operation(summary = "Danh sách đặt bàn theo khách hàng")
-    @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.FRONT_OF_HOUSE)
-    public ResponseEntity<List<ReservationResponse>> getByCustomer(@PathVariable Integer customerId) {
-        return ResponseEntity.ok(reservationService.getReservationsByCustomer(customerId));
     }
 
     // ── Public guest booking endpoints (no JWT required) ─────────────────────
