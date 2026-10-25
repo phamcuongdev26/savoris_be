@@ -38,9 +38,6 @@ public enum ErrorCode {
     INSUFFICIENT_CASH("INSUFFICIENT_CASH", "Cash received is less than the order total", 400),
     PAYMENT_METHOD_NOT_SUPPORTED("PAYMENT_METHOD_NOT_SUPPORTED", "Bank transfer is only for web takeaway orders the guest chose to pay by transfer", 400),
     MENU_ITEM_UNAVAILABLE("MENU_ITEM_UNAVAILABLE", "Menu item is not available at this branch", 409),
-    PROMOTION_NOT_APPLICABLE("PROMOTION_NOT_APPLICABLE", "Promotion code cannot be used for this order", 409),
-    NOT_ENOUGH_POINTS("NOT_ENOUGH_POINTS", "Customer does not have enough points", 409),
-
     // Peak hours
     BRANCH_BUSY("BRANCH_BUSY", "Kitchen is at full capacity, takeaway and delivery orders are paused", 503),
     IMAGE_STORAGE_NOT_CONFIGURED("IMAGE_STORAGE_NOT_CONFIGURED", "Image upload is not set up: set CLOUDINARY_URL on the server", 503),

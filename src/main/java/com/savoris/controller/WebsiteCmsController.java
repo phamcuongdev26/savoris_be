@@ -197,8 +197,7 @@ public class WebsiteCmsController {
     }
 
     private List<Map<String, Object>> publicRows(String table, Integer branchId) {
-        String sourceRequired = table.equals("testimonial") ? " and source<>''" : "";
-        String sql = "select * from " + table + " where visible=true" + sourceRequired + (branchId == null ? "" : " and branch_id=?") + " order by " + (table.equals("opening_hour") ? "weekday" : "sort_order,id");
+        String sql = "select * from " + table + " where visible=true" + (branchId == null ? "" : " and branch_id=?") + " order by " + (table.equals("opening_hour") ? "weekday" : "sort_order,id");
         return branchId == null ? jdbc.queryForList(sql) : jdbc.queryForList(sql, branchId);
     }
 

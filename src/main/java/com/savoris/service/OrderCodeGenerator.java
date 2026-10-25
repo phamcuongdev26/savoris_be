@@ -26,12 +26,6 @@ public class OrderCodeGenerator {
         return next(branchId, "ORDER", "B");
     }
 
-    // Purchase orders: PN3-261007-0001 (phiếu nhập)
-    @Transactional(propagation = Propagation.MANDATORY)
-    public String nextPurchase(Integer branchId) {
-        return next(branchId, "PURCHASE", "PN");
-    }
-
     // Runs inside the caller's transaction: the branch's counter row stays locked until it commits,
     // so two cashiers ordering at the same time never get the same number
     private String next(Integer branchId, String type, String prefix) {

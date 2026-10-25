@@ -51,7 +51,7 @@ public class MediaController {
         if (!name.matches("[a-f0-9-]{36}\\.(jpg|png|webp)")) throw new AppException(ErrorCode.INVALID_REQUEST, "Tên ảnh không hợp lệ");
         String url = "/api/v1/media/" + name;
         String like = "%" + url + "%";
-        boolean used = Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from branch_page where payload::text like ?) or exists(select 1 from offer where image_url like ?) or exists(select 1 from gallery_image where image_url like ?) or exists(select 1 from site_setting where payload::text like ?)", Boolean.class, like, like, like, like));
+        boolean used = Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from branch_page where payload::text like ?) or exists(select 1 from gallery_image where image_url like ?) or exists(select 1 from site_setting where payload::text like ?)", Boolean.class, like, like, like));
         if (used) throw new AppException(ErrorCode.CONFLICT, "Ảnh đang được dùng trong nội dung website");
         Files.deleteIfExists(Path.of(storageDirectory).toAbsolutePath().normalize().resolve(name));
         return ResponseEntity.noContent().build();
