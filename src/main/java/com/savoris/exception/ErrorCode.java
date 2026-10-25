@@ -14,37 +14,37 @@ public enum ErrorCode {
     TOO_MANY_LOGIN_ATTEMPTS("TOO_MANY_LOGIN_ATTEMPTS", "Bạn đăng nhập sai quá nhiều lần, vui lòng thử lại sau", 429),
 
     // Validation errors
-    VALIDATION_ERROR("VALIDATION_ERROR", "Validation failed", 400),
-    INVALID_REQUEST("INVALID_REQUEST", "Invalid request", 400),
-    METHOD_NOT_ALLOWED("METHOD_NOT_ALLOWED", "HTTP method not allowed", 405),
+    VALIDATION_ERROR("VALIDATION_ERROR", "Dữ liệu không hợp lệ", 400),
+    INVALID_REQUEST("INVALID_REQUEST", "Yêu cầu không hợp lệ", 400),
+    METHOD_NOT_ALLOWED("METHOD_NOT_ALLOWED", "Phương thức HTTP không được hỗ trợ", 405),
 
     // Resource not found
-    NOT_FOUND("NOT_FOUND", "Resource not found", 404),
-    STAFF_NOT_FOUND("STAFF_NOT_FOUND", "Staff not found", 404),
-    BRANCH_NOT_FOUND("BRANCH_NOT_FOUND", "Branch not found", 404),
+    NOT_FOUND("NOT_FOUND", "Không tìm thấy tài nguyên", 404),
+    STAFF_NOT_FOUND("STAFF_NOT_FOUND", "Không tìm thấy nhân viên", 404),
+    BRANCH_NOT_FOUND("BRANCH_NOT_FOUND", "Không tìm thấy chi nhánh", 404),
 
     // Conflict errors
-    CONFLICT("CONFLICT", "Resource already exists", 409),
-    DUPLICATE_USERNAME("DUPLICATE_USERNAME", "Username already exists", 409),
-    DUPLICATE_EMAIL("DUPLICATE_EMAIL", "Email already exists", 409),
-    DUPLICATE_CODE("DUPLICATE_CODE", "Code already exists", 409),
-    DUPLICATE_TABLE_NAME("DUPLICATE_TABLE_NAME", "Another table of this branch already has this name", 409),
+    CONFLICT("CONFLICT", "Dữ liệu đã tồn tại", 409),
+    DUPLICATE_USERNAME("DUPLICATE_USERNAME", "Tên đăng nhập đã được sử dụng", 409),
+    DUPLICATE_EMAIL("DUPLICATE_EMAIL", "Email đã được sử dụng", 409),
+    DUPLICATE_CODE("DUPLICATE_CODE", "Mã đã tồn tại", 409),
+    DUPLICATE_TABLE_NAME("DUPLICATE_TABLE_NAME", "Tên bàn đã tồn tại trong chi nhánh này", 409),
 
     // Invalid state
-    INVALID_STATE("INVALID_STATE", "Operation not allowed in current state", 409),
-    TABLE_OCCUPIED("TABLE_OCCUPIED", "Table is occupied", 409),
-    ORDER_NOT_PAID("ORDER_NOT_PAID", "Order has not been paid yet", 409),
-    ALREADY_PAID("ALREADY_PAID", "Order has already been paid", 409),
-    INSUFFICIENT_CASH("INSUFFICIENT_CASH", "Cash received is less than the order total", 400),
-    PAYMENT_METHOD_NOT_SUPPORTED("PAYMENT_METHOD_NOT_SUPPORTED", "Bank transfer is only for web takeaway orders the guest chose to pay by transfer", 400),
-    MENU_ITEM_UNAVAILABLE("MENU_ITEM_UNAVAILABLE", "Menu item is not available at this branch", 409),
+    INVALID_STATE("INVALID_STATE", "Thao tác không hợp lệ ở trạng thái hiện tại", 409),
+    TABLE_OCCUPIED("TABLE_OCCUPIED", "Bàn đang có khách", 409),
+    ORDER_NOT_PAID("ORDER_NOT_PAID", "Đơn hàng chưa được thanh toán", 409),
+    ALREADY_PAID("ALREADY_PAID", "Đơn hàng đã được thanh toán", 409),
+    INSUFFICIENT_CASH("INSUFFICIENT_CASH", "Tiền khách đưa ít hơn tổng đơn hàng", 400),
+    PAYMENT_METHOD_NOT_SUPPORTED("PAYMENT_METHOD_NOT_SUPPORTED", "Chuyển khoản chỉ áp dụng cho đơn mang về từ website mà khách chọn thanh toán chuyển khoản", 400),
+    MENU_ITEM_UNAVAILABLE("MENU_ITEM_UNAVAILABLE", "Món ăn không có sẵn tại chi nhánh này", 409),
     // Peak hours
-    BRANCH_BUSY("BRANCH_BUSY", "Kitchen is at full capacity, takeaway and delivery orders are paused", 503),
-    IMAGE_STORAGE_NOT_CONFIGURED("IMAGE_STORAGE_NOT_CONFIGURED", "Image upload is not set up: set CLOUDINARY_URL on the server", 503),
-    IMAGE_UPLOAD_FAILED("IMAGE_UPLOAD_FAILED", "Could not store the image, try again", 502),
+    BRANCH_BUSY("BRANCH_BUSY", "Bếp đang quá tải, tạm dừng nhận đơn mang về", 503),
+    IMAGE_STORAGE_NOT_CONFIGURED("IMAGE_STORAGE_NOT_CONFIGURED", "Chưa cấu hình lưu trữ ảnh: cần đặt CLOUDINARY_URL trên máy chủ", 503),
+    IMAGE_UPLOAD_FAILED("IMAGE_UPLOAD_FAILED", "Không thể lưu ảnh, vui lòng thử lại", 502),
 
     // Server errors
-    INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "Internal server error", 500);
+    INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "Lỗi máy chủ nội bộ", 500);
 
     private final String code;
     private final String message;
