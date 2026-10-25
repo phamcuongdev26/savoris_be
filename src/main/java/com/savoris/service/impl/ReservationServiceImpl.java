@@ -42,7 +42,7 @@ public class ReservationServiceImpl implements ReservationService {
         branchAccessGuard.check(staffId, request.getBranchId());
         return ReservationResponse.from(doCreate(
             request.getBranchId(), request.getCustomerName(), request.getCustomerPhone(),
-            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), staffId));
+            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), staffId, true));
     }
 
     @Override
@@ -50,19 +50,19 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse createGuestReservation(GuestReservationRequest request) {
         return ReservationResponse.from(doCreate(
             request.getBranchId(), request.getGuestName(), request.getGuestPhone(),
-            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), null));
+            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), null, false));
     }
 
     private ReservationEntity doCreate(Integer branchId, String customerName, String customerPhone,
-            int guestCount, LocalDateTime reservationDate, String notes, Integer createdBy) {
+            int guestCount, LocalDateTime reservationDate, String notes, Integer createdBy, boolean isStaff) {
         LocalDateTime slot = reservationDate.withSecond(0).withNano(0);
-        validateOpeningHours(branchId, slot);
+        if (!isStaff) validateOpeningHours(branchId, slot);
         LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
         int booked = reservationRepository
             .findByBranchIdAndReservedAtBetweenAndStatusNotIn(branchId, slot, slotEnd,
                 List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
             .stream().mapToInt(ReservationEntity::getGuestCount).sum();
-        if (booked + guestCount > MAX_GUESTS_SLOT) {
+        if (!isStaff && booked + guestCount > MAX_GUESTS_SLOT) {
             throw new AppException(ErrorCode.INVALID_STATE,
                 "Khung giờ " + slot.toLocalTime() + " đã hết chỗ. Vui lòng chọn khung khác.");
         }
