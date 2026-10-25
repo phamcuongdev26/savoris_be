@@ -90,12 +90,95 @@ Codex review commit d0f360d: **"Không tìm thấy lỗi nào đáng kể."**
 
 ---
 
-## B2 — CHƯA BẮT ĐẦU
+## B2 — ĐÃ HOÀN THÀNH
 
-Việc cần làm:
-- B2.1: Fix `PUT /admin/website/hours` 500; thêm `PUT /admin/website/hours/week` (upsert 7 ngày 1 lần); GlobalExceptionHandler cho `DataIntegrityViolationException` → 409
-- B2.2: Dịch toàn bộ message trong `ErrorCode.java` sang tiếng Việt
-- B2.3: Sửa permission matrix (nếu có sai lệch sau B1)
+### B2.1 — Opening hours (commit a6d23c1, fix codex faf934a)
+
+**Root cause của 500:** `persist()` dùng `p.get("weekday")`, `pick(..., "opensAt", ...)` truyền thẳng `String` vào cột `integer` / `time`. PostgreSQL JDBC driver không tự convert String → time.
+
+**Fix:**
+- `extractWeekday()` parse + validate weekday 1–7
+- `parseTime()` parse String→`LocalTime` (HH:mm / HH:mm:ss); ném 400 nếu sai định dạng
+- Validate `opensAt < closesAt` khi `closed=false`
+- Truyền `LocalTime` object vào JdbcTemplate → driver convert đúng sang `time without time zone`
+- Thêm `PUT /admin/website/hours/week`: nhận `{branchId, days[]}`, upsert tất cả trong một transaction (`@Transactional`); dùng `ON CONFLICT DO UPDATE`
+
+**Codex P2 đã áp dụng:**
+- Reject fractional `branchId` (e.g. `1.9` → không truncate thành `1`)
+- Reject duplicate weekday trong cùng một `days` list (400)
+
+**GlobalExceptionHandler:**
+- `DataIntegrityViolationException` → 409, message Vietnamese
+- Thêm `DataAccessException` handler → 500, full log
+
+**Tests (AuthBranchHttpTest.openingHoursValidationAndUpsert):**
+- Valid save → 201 ✓
+- Duplicate weekday → 409 ✓
+- Invalid time (`25:00`) → 400 ✓
+- `opensAt >= closesAt` → 400 ✓
+- MANAGER own branch → 201 ✓
+- MANAGER other branch → 403 ✓
+- Week upsert (idempotent) → 200 ✓
+- Week cross-branch → 403 ✓
+
+### B2.2 — Dịch ErrorCode + GlobalExceptionHandler (commit 7d84745)
+
+Dịch toàn bộ `message` (không đổi `code`) trong `ErrorCode.java` và inline messages trong `GlobalExceptionHandler`.
+
+Codex: "No regression or actionable defect."
+
+### B2.3 — Sửa permission matrix (commit 81d1b6e)
+
+**Thay đổi:**
+
+| Thay đổi | Trước | Sau |
+|---|---|---|
+| `Roles.KITCHEN` | `ADMIN, CHEF` | `ADMIN, MANAGER, CHEF` |
+| `BranchMenuController.setAvailability` | `Roles.SERVICE` (tất cả 4 role) | `Roles.KITCHEN` (ADMIN, MANAGER, CHEF) |
+
+**Permission matrix thực tế sau B2.3 (đọc từ code):**
+
+| Capability | ADMIN | MANAGER | STAFF | CHEF |
+|---|---|---|---|---|
+| Kitchen ops (start/ready/void-resolve) | ✓ | ✓ | – | ✓ |
+| Mark dish sold out (setAvailability) | ✓ | ✓ | – | ✓ |
+| Edit dishes/prices/categories | ✓ | – | – | – |
+| Tables & areas (write) | ✓ | ✓ | – | – |
+| POS, serving, payment | ✓ | ✓ | ✓ | – |
+| Reservations: create, confirm, cancel | ✓ | ✓ | ✓ | – |
+| Branch details / hours (write) | ✓ | ✓ | – | – |
+| Staff accounts (write) | ✓ | ✓ (STAFF/CHEF own branch) | – | – |
+| Chain-wide reports | ✓ | – | – | – |
+| Branch reports | ✓ | ✓ | – | – |
+| Website homepage (write) | ✓ | – | – | – |
+| Website branch page / gallery | ✓ | ✓ | – | – |
+
+**Tests (SecurityRulesTest.permissionMatrixForWriteEndpoints):**
+- STAFF blocked from kitchen start → 403 ✓
+- MANAGER/CHEF allowed for kitchen start → 404 (item not exist, not 403) ✓
+- STAFF blocked from setAvailability → 403 ✓
+- CHEF/MANAGER allowed for setAvailability → 200 ✓
+- Cross-branch MANAGER → 403 ✓
+
+Codex: "The changes consistently expand the kitchen permission to include MANAGER. No introduced bug."
+
+### Kết quả test sau B2
+`mvn test`: **80 pass, 1 skip (PeakLoadTest, pre-existing)**
+
+| Test class | Trước B2 | Sau B2 | Ghi chú |
+|---|---|---|---|
+| AuthBranchHttpTest | 10 | 11 | +openingHoursValidationAndUpsert |
+| SecurityRulesTest | 13 | 14 | +permissionMatrixForWriteEndpoints |
+| Tất cả còn lại | — | — | Không thay đổi |
+| **TỔNG** | **78** | **80** | +2 test mới |
+
+### Commits B2
+```
+faf934a  Fix codex P2 findings on week upsert endpoint
+81d1b6e  B2.3: Fix permission matrix — MANAGER in KITCHEN, STAFF out of availability
+a6d23c1  B2.1: Fix opening_hour persist (500→correct errors) and add week upsert
+7d84745  B2.2: Translate all client-facing ErrorCode messages to Vietnamese
+```
 
 ## B3 — CHƯA BẮT ĐẦU
 
