@@ -16,6 +16,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalTime;
 import java.util.*;
 
 @RestController
@@ -153,6 +156,38 @@ public class WebsiteCmsController {
         return value;
     }
 
+    @PutMapping("/admin/website/hours/week")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Transactional
+    public ResponseEntity<List<Map<String, Object>>> saveWeekHours(@RequestBody Map<String, Object> body, @CurrentUser Integer staffId) {
+        StaffEntity staff = branchAccess.currentUser(staffId);
+        Object rawBranchId = pick(body, "branchId", "branch_id");
+        if (rawBranchId == null) throw new AppException(ErrorCode.INVALID_REQUEST, "branchId là bắt buộc");
+        int branchId = ((Number) rawBranchId).intValue();
+        requestedBranch(branchId, staff);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> days = (List<Map<String, Object>>) body.get("days");
+        if (days == null || days.isEmpty()) throw new AppException(ErrorCode.INVALID_REQUEST, "days là bắt buộc và không được rỗng");
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> day : days) {
+            int weekday = extractWeekday(day);
+            boolean closed = Boolean.TRUE.equals(day.getOrDefault("closed", false));
+            LocalTime opensAt = parseTime(pick(day, "opensAt", "opens_at"), "opensAt");
+            LocalTime closesAt = parseTime(pick(day, "closesAt", "closes_at"), "closesAt");
+            if (!closed) {
+                if (opensAt == null || closesAt == null) throw new AppException(ErrorCode.INVALID_REQUEST, "opensAt và closesAt là bắt buộc khi chi nhánh mở cửa");
+                if (!opensAt.isBefore(closesAt)) throw new AppException(ErrorCode.INVALID_REQUEST, "opensAt phải trước closesAt");
+            }
+            Long savedId = jdbc.queryForObject(
+                "insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,?,?,?) on conflict(branch_id,weekday) do update set opens_at=excluded.opens_at,closes_at=excluded.closes_at,closed=excluded.closed returning id",
+                Long.class, branchId, weekday, opensAt, closesAt, closed);
+            result.add(jdbc.queryForMap("select * from opening_hour where id=?", savedId));
+        }
+        return ResponseEntity.ok(result);
+    }
+
     private Map<String, Object> persist(String table, Long id, Map<String, Object> p) {
         String sql;
         Object[] args;
@@ -160,13 +195,38 @@ public class WebsiteCmsController {
             sql = id == null ? "insert into gallery_image(branch_id,image_url,alt,sort_order,visible) values(?,?,?,?,?) returning id" : "update gallery_image set branch_id=?,image_url=?,alt=?,sort_order=?,visible=? where id=? returning id";
             args = new Object[]{pick(p, "branchId", "branch_id"), pick(p, "imageUrl", "image_url"), p.get("alt"), pick(p, "sortOrder", "sort_order", 0), p.getOrDefault("visible", true)};
         } else {
+            int weekday = extractWeekday(p);
+            boolean closed = Boolean.TRUE.equals(p.getOrDefault("closed", false));
+            LocalTime opensAt = parseTime(pick(p, "opensAt", "opens_at"), "opensAt");
+            LocalTime closesAt = parseTime(pick(p, "closesAt", "closes_at"), "closesAt");
+            if (!closed) {
+                if (opensAt == null || closesAt == null) throw new AppException(ErrorCode.INVALID_REQUEST, "opensAt và closesAt là bắt buộc khi chi nhánh mở cửa");
+                if (!opensAt.isBefore(closesAt)) throw new AppException(ErrorCode.INVALID_REQUEST, "opensAt phải trước closesAt");
+            }
             sql = id == null ? "insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,?,?,?) returning id" : "update opening_hour set branch_id=?,weekday=?,opens_at=?,closes_at=?,closed=? where id=? returning id";
-            args = new Object[]{pick(p, "branchId", "branch_id"), p.get("weekday"), pick(p, "opensAt", "opens_at"), pick(p, "closesAt", "closes_at"), p.getOrDefault("closed", false)};
+            args = new Object[]{pick(p, "branchId", "branch_id"), weekday, opensAt, closesAt, closed};
         }
         if (id != null) args = Arrays.copyOf(args, args.length + 1);
         if (id != null) args[args.length - 1] = id;
         Long savedId = jdbc.queryForObject(sql, Long.class, args);
         return jdbc.queryForMap("select * from " + table + " where id=?", savedId);
+    }
+
+    private int extractWeekday(Map<String, Object> p) {
+        Object raw = p.get("weekday");
+        if (raw == null) throw new AppException(ErrorCode.INVALID_REQUEST, "weekday là bắt buộc");
+        int weekday;
+        try { weekday = ((Number) raw).intValue(); }
+        catch (ClassCastException e) { throw new AppException(ErrorCode.INVALID_REQUEST, "weekday phải là số"); }
+        if (weekday < 1 || weekday > 7) throw new AppException(ErrorCode.INVALID_REQUEST, "weekday phải từ 1 (Thứ Hai) đến 7 (Chủ Nhật)");
+        return weekday;
+    }
+
+    private LocalTime parseTime(Object value, String fieldName) {
+        if (value == null) return null;
+        String s = value.toString().trim();
+        try { return LocalTime.parse(s); }
+        catch (Exception e) { throw new AppException(ErrorCode.INVALID_REQUEST, fieldName + " phải theo định dạng HH:mm"); }
     }
 
     private List<Map<String, Object>> visibleRows(String table, Integer branchId) {

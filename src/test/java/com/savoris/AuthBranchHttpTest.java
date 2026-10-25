@@ -334,6 +334,51 @@ class AuthBranchHttpTest {
         assertEquals("[]", kitchenQueue.body().trim());
     }
 
+    @Test
+    void openingHoursValidationAndUpsert() throws Exception {
+        String adminCookie = accessCookie(login("admin-http", "Correct@123"));
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+        String manager2Cookie = accessCookie(login("manager2-http", "Correct@123"));
+
+        // Valid save for cn1 (weekday 1, 08:00–22:00)
+        String valid = "{\"branchId\":" + cn1.getId() + ",\"weekday\":1,\"opensAt\":\"08:00\",\"closesAt\":\"22:00\",\"closed\":false}";
+        assertEquals(201, exchange(HttpMethod.POST, "/admin/website/hours", valid, adminCookie).statusCode());
+
+        // Duplicate weekday → 409 (unique constraint branch_id+weekday)
+        assertEquals(409, exchange(HttpMethod.POST, "/admin/website/hours", valid, adminCookie).statusCode());
+
+        // Invalid time format → 400
+        String badTime = "{\"branchId\":" + cn1.getId() + ",\"weekday\":2,\"opensAt\":\"25:00\",\"closesAt\":\"22:00\",\"closed\":false}";
+        assertEquals(400, exchange(HttpMethod.POST, "/admin/website/hours", badTime, adminCookie).statusCode());
+
+        // opensAt >= closesAt → 400
+        String badRange = "{\"branchId\":" + cn1.getId() + ",\"weekday\":3,\"opensAt\":\"22:00\",\"closesAt\":\"08:00\",\"closed\":false}";
+        assertEquals(400, exchange(HttpMethod.POST, "/admin/website/hours", badRange, adminCookie).statusCode());
+
+        // MANAGER saves for their own branch → 201
+        String ownBranch = "{\"branchId\":" + cn1.getId() + ",\"weekday\":4,\"opensAt\":\"09:00\",\"closesAt\":\"21:00\",\"closed\":false}";
+        assertEquals(201, exchange(HttpMethod.POST, "/admin/website/hours", ownBranch, managerCookie).statusCode());
+
+        // MANAGER saves for another branch → 403
+        String otherBranch = "{\"branchId\":" + cn2.getId() + ",\"weekday\":5,\"opensAt\":\"09:00\",\"closesAt\":\"21:00\",\"closed\":false}";
+        assertEquals(403, exchange(HttpMethod.POST, "/admin/website/hours", otherBranch, managerCookie).statusCode());
+
+        // Week upsert: cn2 manager saves all 7 days in one call
+        String week = "{\"branchId\":" + cn2.getId() + ",\"days\":["
+            + "{\"weekday\":1,\"opensAt\":\"10:00\",\"closesAt\":\"20:00\",\"closed\":false},"
+            + "{\"weekday\":2,\"closed\":true},"
+            + "{\"weekday\":3,\"opensAt\":\"10:00\",\"closesAt\":\"20:00\",\"closed\":false}"
+            + "]}";
+        HttpResponse<String> weekResp = exchange(HttpMethod.PUT, "/admin/website/hours/week", week, manager2Cookie);
+        assertEquals(200, weekResp.statusCode());
+        // Upsert again (should update, not 409)
+        assertEquals(200, exchange(HttpMethod.PUT, "/admin/website/hours/week", week, manager2Cookie).statusCode());
+
+        // Week upsert for another branch → 403
+        String weekOther = "{\"branchId\":" + cn1.getId() + ",\"days\":[{\"weekday\":6,\"closed\":true}]}";
+        assertEquals(403, exchange(HttpMethod.PUT, "/admin/website/hours/week", weekOther, manager2Cookie).statusCode());
+    }
+
     private HttpResponse<String> login(String username, String password) throws Exception {
         String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
         return CLIENT.send(HttpRequest.newBuilder(URI.create(url("/auth/login")))
