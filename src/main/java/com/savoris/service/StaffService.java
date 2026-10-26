@@ -11,6 +11,7 @@ public interface StaffService {
     StaffDetailResponse getStaff(Integer actorId, Integer staffId);
     StaffDetailResponse updateStaff(Integer actorId, Integer staffId, UpdateStaffRequest request);
     void deleteStaff(Integer actorId, Integer staffId);
+    void activateStaff(Integer actorId, Integer staffId);
     void resetPassword(Integer actorId, Integer staffId, String newPassword);
     List<StaffDetailResponse> getStaffByBranch(Integer actorId, Integer branchId);
     List<StaffDetailResponse> searchStaff(String fullName);

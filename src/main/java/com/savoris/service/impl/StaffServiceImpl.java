@@ -126,6 +126,18 @@ public class StaffServiceImpl implements StaffService {
         log.info("Deactivated staff: {} ({})", staff.getFullName(), staff.getCode());
     }
 
+    @Override
+    @Transactional
+    public void activateStaff(Integer actorId, Integer staffId) {
+        StaffEntity staff = findStaff(staffId);
+        checkCanManage(findStaff(actorId), staff.getBranchId(), staff.getRole());
+
+        staff.setStatus(StaffStatus.ACTIVE);
+        staff.setUpdatedAt(LocalDateTime.now());
+        staffRepository.save(staff);
+        log.info("Reactivated staff: {} ({})", staff.getFullName(), staff.getCode());
+    }
+
     // For staff who forgot their password; every session they had is ended
     @Override
     @Transactional

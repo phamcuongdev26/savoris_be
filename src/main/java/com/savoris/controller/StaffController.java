@@ -86,6 +86,16 @@ public class StaffController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{staffId}/activate")
+    @Operation(summary = "Mở khóa tài khoản nhân viên")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.MANAGEMENT)
+    public ResponseEntity<Void> activateStaff(@CurrentUser Integer actorId, @PathVariable Integer staffId) {
+        staffService.activateStaff(actorId, staffId);
+        auditLogger.log(actorId, null, "ACTIVATE", "STAFF", staffId, null, null);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/branch/{branchId}")
     @Operation(summary = "Danh sách nhân viên theo chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
