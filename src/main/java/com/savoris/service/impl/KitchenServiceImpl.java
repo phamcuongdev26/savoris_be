@@ -16,6 +16,7 @@ import com.savoris.repository.OrderRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.notification.TakeawayNotifier;
 import com.savoris.service.KitchenService;
+import com.savoris.service.KitchenQueueEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +51,7 @@ public class KitchenServiceImpl implements KitchenService {
     private final BranchRepository branchRepository;
     private final BranchAccessGuard branchAccessGuard;
     private final TakeawayNotifier takeawayNotifier;
+    private final KitchenQueueEvents kitchenQueueEvents;
 
     @Value("${savoris.kitchen.default-capacity:40}")
     private int defaultCapacity;
@@ -130,6 +132,7 @@ public class KitchenServiceImpl implements KitchenService {
             default -> { }
         }
         orderItemRepository.save(updated);
+        kitchenQueueEvents.changed(order.getBranchId());
         if (to == OrderItemStatus.READY) {
             takeawayNotifier.notifyIfReady(order);
         }

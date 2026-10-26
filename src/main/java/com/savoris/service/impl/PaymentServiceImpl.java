@@ -17,6 +17,7 @@ import com.savoris.repository.PaymentRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.service.SettingService;
 import com.savoris.service.PaymentService;
+import com.savoris.service.KitchenQueueEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final BranchAccessGuard branchAccessGuard;
     private final OrderItemRepository orderItemRepository;
     private final TakeawayNotifier takeawayNotifier;
+    private final KitchenQueueEvents kitchenQueueEvents;
     private final SettingService settingService;
 
     @Override
@@ -142,6 +144,7 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.OPEN);
         orderRepository.save(order);
         orderItemRepository.requeue(order.getId(), LocalDateTime.now());
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Web takeaway {} paid: sent to the kitchen", order.getCode());
         // Only ready-made dishes: nothing to cook, the guest can come now
         takeawayNotifier.notifyIfReady(order);
