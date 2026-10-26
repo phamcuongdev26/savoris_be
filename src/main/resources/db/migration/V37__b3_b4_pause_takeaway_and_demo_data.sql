@@ -64,8 +64,8 @@ JOIN (VALUES
 ON CONFLICT (branch_id, name) DO NOTHING;
 
 -- B4: tables – CN01 (Hoàn Kiếm)
-INSERT INTO dining_tables (area_id, name, capacity, status)
-SELECT a.id, t.tname, t.cap, 'AVAILABLE'
+INSERT INTO dining_tables (area_id, name, capacity, qr_token, status)
+SELECT a.id, t.tname, t.cap, md5(b.code || ':' || a.name || ':' || t.tname), 'AVAILABLE'
 FROM areas a
 JOIN branches b ON b.id = a.branch_id AND b.code = 'CN01'
 JOIN (VALUES
@@ -77,8 +77,8 @@ JOIN (VALUES
 ON CONFLICT (area_id, name) DO NOTHING;
 
 -- B4: tables – CN02 (Cầu Giấy)
-INSERT INTO dining_tables (area_id, name, capacity, status)
-SELECT a.id, t.tname, t.cap, 'AVAILABLE'
+INSERT INTO dining_tables (area_id, name, capacity, qr_token, status)
+SELECT a.id, t.tname, t.cap, md5(b.code || ':' || a.name || ':' || t.tname), 'AVAILABLE'
 FROM areas a
 JOIN branches b ON b.id = a.branch_id AND b.code = 'CN02'
 JOIN (VALUES
@@ -90,8 +90,8 @@ JOIN (VALUES
 ON CONFLICT (area_id, name) DO NOTHING;
 
 -- B4: tables – CN03 (Tây Hồ)
-INSERT INTO dining_tables (area_id, name, capacity, status)
-SELECT a.id, t.tname, t.cap, 'AVAILABLE'
+INSERT INTO dining_tables (area_id, name, capacity, qr_token, status)
+SELECT a.id, t.tname, t.cap, md5(b.code || ':' || a.name || ':' || t.tname), 'AVAILABLE'
 FROM areas a
 JOIN branches b ON b.id = a.branch_id AND b.code = 'CN03'
 JOIN (VALUES
@@ -103,8 +103,8 @@ JOIN (VALUES
 ON CONFLICT (area_id, name) DO NOTHING;
 
 -- B4: tables – CN04 (Long Biên)
-INSERT INTO dining_tables (area_id, name, capacity, status)
-SELECT a.id, t.tname, t.cap, 'AVAILABLE'
+INSERT INTO dining_tables (area_id, name, capacity, qr_token, status)
+SELECT a.id, t.tname, t.cap, md5(b.code || ':' || a.name || ':' || t.tname), 'AVAILABLE'
 FROM areas a
 JOIN branches b ON b.id = a.branch_id AND b.code = 'CN04'
 JOIN (VALUES
