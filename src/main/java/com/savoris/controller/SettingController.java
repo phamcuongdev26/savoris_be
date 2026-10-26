@@ -1,6 +1,7 @@
 package com.savoris.controller;
 
 import com.savoris.security.CurrentUser;
+import com.savoris.security.BranchAccessGuard;
 import com.savoris.security.Roles;
 import com.savoris.payment.Sepay;
 import com.savoris.service.SettingService;
@@ -36,6 +37,7 @@ public class SettingController {
 
     private final SettingService settingService;
     private final Sepay sepay;
+    private final BranchAccessGuard branchAccess;
 
     private static final String WEBHOOK_PATH = "/api/v1/public/sepay/webhook";
     private static final int DEFAULT_BRANCH_ID = 1;
@@ -43,7 +45,7 @@ public class SettingController {
     public record VatSetting(@NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal percent) {
     }
 
-    // Empty or null url = no transfer QR: web takeaway guests can then only pay cash at the counter
+    // Empty or null URL means the branch cannot accept web takeaway orders until transfer details are configured.
     public record TransferQrSetting(
         @jakarta.validation.constraints.Pattern(regexp = "^$|^https?://\\S+$|^/api/v1/public/images/\\S+$", message = "Link must start with http:// or https://")
         @jakarta.validation.constraints.Size(max = 1000) String url) {
@@ -63,8 +65,8 @@ public class SettingController {
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Tài khoản nhận chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/bank-account cho từng chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<BankAccountSetting> getDefaultBankAccount() {
-        return getBankAccount(DEFAULT_BRANCH_ID);
+    public ResponseEntity<BankAccountSetting> getDefaultBankAccount(@CurrentUser Integer staffId) {
+        return getBankAccount(staffId, DEFAULT_BRANCH_ID);
     }
 
     @PutMapping("/bank-account")
@@ -77,19 +79,21 @@ public class SettingController {
     }
 
     @GetMapping("/branches/{branchId}/bank-account")
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Tài khoản nhận chuyển khoản", description = "Mỗi đơn mang về có mã QR riêng (số tiền + mã đơn). autoConfirm = đã đặt SEPAY_API_KEY")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<BankAccountSetting> getBankAccount(@PathVariable Integer branchId) {
+    public ResponseEntity<BankAccountSetting> getBankAccount(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        branchAccess.check(staffId, branchId);
         return ResponseEntity.ok(bankAccountSetting(settingService.getBankAccount(branchId)));
     }
 
     @PutMapping("/branches/{branchId}/bank-account")
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Đổi tài khoản nhận chuyển khoản", description = "{\"bank\": \"MBBank\", \"accountNumber\": \"0123456789\", \"accountName\": \"...\"}; để trống cả hai = bỏ tài khoản")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountSetting> updateBankAccount(@CurrentUser Integer staffId, @PathVariable Integer branchId,
                                                                 @Valid @RequestBody BankAccountRequest request) {
+        branchAccess.check(staffId, branchId);
         return ResponseEntity.ok(bankAccountSetting(settingService.updateBankAccount(staffId, branchId,
             new SettingService.BankAccount(request.bank(), request.accountNumber(), request.accountName()))));
     }
@@ -104,8 +108,8 @@ public class SettingController {
     @PreAuthorize(Roles.ADMIN)
     @Operation(summary = "Link ảnh mã QR chuyển khoản CN01", description = "Endpoint tương thích giao diện cũ; dùng /settings/branches/{branchId}/transfer-qr cho từng chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<TransferQrSetting> getDefaultTransferQr() {
-        return getTransferQr(DEFAULT_BRANCH_ID);
+    public ResponseEntity<TransferQrSetting> getDefaultTransferQr(@CurrentUser Integer staffId) {
+        return getTransferQr(staffId, DEFAULT_BRANCH_ID);
     }
 
     @PutMapping("/transfer-qr")
@@ -127,28 +131,31 @@ public class SettingController {
     }
 
     @GetMapping("/branches/{branchId}/transfer-qr")
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Link ảnh mã QR chuyển khoản", description = "Khách đặt mang về chọn chuyển khoản sẽ thấy ảnh này")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<TransferQrSetting> getTransferQr(@PathVariable Integer branchId) {
+    public ResponseEntity<TransferQrSetting> getTransferQr(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        branchAccess.check(staffId, branchId);
         return ResponseEntity.ok(new TransferQrSetting(settingService.getTransferQrUrl(branchId)));
     }
 
     @PutMapping("/branches/{branchId}/transfer-qr")
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Đổi link ảnh mã QR chuyển khoản", description = "{\"url\": \"https://...png\"}; để trống = tắt chuyển khoản")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<TransferQrSetting> updateTransferQr(@CurrentUser Integer staffId, @PathVariable Integer branchId,
                                                               @Valid @RequestBody TransferQrSetting request) {
+        branchAccess.check(staffId, branchId);
         return ResponseEntity.ok(new TransferQrSetting(settingService.updateTransferQrUrl(staffId, branchId, request.url())));
     }
 
     @PutMapping(value = "/branches/{branchId}/transfer-qr/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Tải ảnh mã QR chuyển khoản lên", description = "Form-data field \"file\": ảnh PNG, JPEG hoặc WebP, tối đa 2MB. Thay link QR bằng ảnh vừa tải")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<TransferQrSetting> uploadTransferQr(@CurrentUser Integer staffId, @PathVariable Integer branchId,
                                                               @RequestParam("file") MultipartFile file) throws IOException {
+        branchAccess.check(staffId, branchId);
         return ResponseEntity.ok(new TransferQrSetting(settingService.uploadTransferQr(staffId, branchId, file.getContentType(), file.getBytes())));
     }
 

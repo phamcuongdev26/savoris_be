@@ -222,11 +222,11 @@ public class OrderServiceImpl implements OrderService {
         if (branch.getStatus() != BranchStatus.ACTIVE) {
             throw new AppException(ErrorCode.INVALID_STATE, "Chi nhánh " + branch.getCode() + " không nhận đơn");
         }
-        if (request.payMethod() != PaymentMethod.CASH && request.payMethod() != PaymentMethod.BANK_TRANSFER) {
+        if (request.payMethod() != PaymentMethod.BANK_TRANSFER) {
             throw new AppException(ErrorCode.PAYMENT_METHOD_NOT_SUPPORTED);
         }
-        if (request.payMethod() == PaymentMethod.BANK_TRANSFER && !settingService.transferAvailable(branch.getId())) {
-            throw new AppException(ErrorCode.PAYMENT_METHOD_NOT_SUPPORTED, "Chuyển khoản chưa được thiết lập: vui lòng thanh toán tiền mặt tại quầy");
+        if (!settingService.transferAvailable(branch.getId())) {
+            throw new AppException(ErrorCode.PAYMENT_METHOD_NOT_SUPPORTED, "Chi nhánh chưa thiết lập thanh toán chuyển khoản cho đơn mang về.");
         }
         checkKitchenAcceptsTakeaway(branch);
 

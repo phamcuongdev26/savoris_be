@@ -318,9 +318,11 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
         // The QR is only worth showing while the guest still has to transfer
         boolean transferring = order.getStatus() == OrderStatus.AWAITING_PAYMENT && order.getPayMethod() == PaymentMethod.BANK_TRANSFER;
         SettingService.BankAccount account = transferring ? settingService.getBankAccount(order.getBranchId()) : null;
+        String customQr = transferring ? settingService.getTransferQrUrl(order.getBranchId()) : null;
         String qr = !transferring ? null
+            : customQr != null ? customQr
             : account != null ? Sepay.qrUrl(account, order.getTotalAmount(), order.getCode())
-            : settingService.getTransferQrUrl(order.getBranchId());
+            : null;
         List<OrderItemEntity> lines = orderItemRepository.findByOrderId(order.getId());
         Map<Integer, String> images = menuItemRepository.imagesOf(lines.stream().map(OrderItemEntity::getMenuItemId).toList());
         List<GuestOrderResponse.Item> items = lines.stream()

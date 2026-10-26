@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * A takeaway order a guest places on the website. payMethod: CASH (pay at the counter) or BANK_TRANSFER.
+ * A web takeaway order. Payment must be BANK_TRANSFER and the order stays out of the kitchen until confirmed paid.
  */
 public record WebTakeawayRequest(
     @NotNull(message = "Branch is required") Integer branchId,
