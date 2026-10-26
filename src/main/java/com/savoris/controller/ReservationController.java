@@ -41,6 +41,7 @@ public class ReservationController {
     @GetMapping("/{reservationId}")
     @Operation(summary = "Lấy đặt bàn")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.FRONT_OF_HOUSE)
     public ResponseEntity<ReservationResponse> getReservation(@CurrentUser Integer staffId, @PathVariable Integer reservationId) {
         return ResponseEntity.ok(reservationService.getReservation(staffId, reservationId));
     }
@@ -72,6 +73,7 @@ public class ReservationController {
     @GetMapping("/branch/{branchId}")
     @Operation(summary = "Danh sách đặt bàn theo chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.FRONT_OF_HOUSE)
     public ResponseEntity<List<ReservationResponse>> getByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) com.savoris.constant.ReservationStatus status,

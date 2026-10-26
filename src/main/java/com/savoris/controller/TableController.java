@@ -27,6 +27,7 @@ public class TableController {
     private final FloorService floorService;
 
     @GetMapping("/branches/{branchId}/tables")
+    @PreAuthorize(Roles.ORDER_WRITE)
     @Operation(summary = "Sơ đồ bàn", description = "Danh sách bàn của chi nhánh và trạng thái (trống / có khách)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<TableResponse>> getTables(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
@@ -34,6 +35,7 @@ public class TableController {
     }
 
     @GetMapping("/branches/{branchId}/areas")
+    @PreAuthorize(Roles.ORDER_WRITE)
     @Operation(summary = "Khu vực của chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<AreaResponse>> getAreas(@CurrentUser Integer staffId, @PathVariable Integer branchId) {

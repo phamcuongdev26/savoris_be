@@ -146,12 +146,13 @@ class OrderFlowTest extends IntegrationTestSupport {
 
     @Test
     void cancellingAnOrderRemovesItsDishesFromTheKitchenQueue() throws Exception {
+        StaffEntity chef = createStaff(StaffRole.CHEF, branch);
         String created = mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "TAKEAWAY", null, dish(pho, 2), dish(tea, 1))))
             .andReturn().getResponse().getContentAsString();
         int orderId = JsonPath.read(created, "$.id");
 
-        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(cashier)))
+        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(chef)))
             .andExpect(jsonPath("$", hasSize(2)));
 
         mockMvc.perform(put("/orders/" + orderId + "/cancel").with(as(cashier)))
@@ -159,7 +160,7 @@ class OrderFlowTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.status").value("CANCELLED"))
             .andExpect(jsonPath("$.items[0].status").value("CANCELLED"));
 
-        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(cashier)))
+        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(chef)))
             .andExpect(jsonPath("$", hasSize(0)));
     }
 

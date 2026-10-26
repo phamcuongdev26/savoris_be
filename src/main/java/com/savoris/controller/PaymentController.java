@@ -32,6 +32,7 @@ public class PaymentController {
     }
 
     @GetMapping("/{paymentId}")
+    @PreAuthorize(Roles.PAYMENT)
     @Operation(summary = "Lấy thông tin thanh toán")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<PaymentResponse> getPayment(@CurrentUser Integer staffId, @PathVariable Integer paymentId) {
@@ -39,6 +40,7 @@ public class PaymentController {
     }
 
     @GetMapping("/order/{orderId}")
+    @PreAuthorize(Roles.PAYMENT)
     @Operation(summary = "Lấy thanh toán theo đơn hàng")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<PaymentResponse> getPaymentByOrder(@CurrentUser Integer staffId, @PathVariable Integer orderId) {

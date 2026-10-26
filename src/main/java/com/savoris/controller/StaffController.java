@@ -57,6 +57,7 @@ public class StaffController {
     }
 
     @GetMapping("/{staffId}")
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Lấy thông tin nhân viên")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
