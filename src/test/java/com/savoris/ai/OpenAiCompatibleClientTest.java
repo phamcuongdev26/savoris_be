@@ -23,7 +23,7 @@ class OpenAiCompatibleClientTest {
     void sendsToolSchemasAndParsesAProviderToolCall() throws Exception {
         AtomicReference<String> requestBody = new AtomicReference<>();
         try (StubProvider provider = new StubProvider(200, """
-            {"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"get_branches","arguments":"{}"}}]}}]}
+            {"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","extra_content":{"google":{"thought_signature":"sig-1"}},"function":{"name":"get_branches","arguments":"{}"}}]}}]}
             """, requestBody)) {
             OpenAiCompatibleClient client = client(provider, "secret-test-key");
             var completion = client.complete(
@@ -31,8 +31,8 @@ class OpenAiCompatibleClientTest {
                 List.of(Map.of("type", "function", "function", Map.of("name", "get_branches"))), false);
 
             assertThat(completion.content()).isNull();
-            assertThat(completion.toolCalls()).containsExactly(
-                new AiModelClient.AiToolCall("call-1", "get_branches", "{}"));
+            assertThat(completion.toolCalls()).containsExactly(new AiModelClient.AiToolCall(
+                "call-1", "get_branches", "{}", Map.of("google", Map.of("thought_signature", "sig-1"))));
             assertThat(requestBody.get()).contains("\"model\":\"test-model\"")
                 .contains("\"tools\"").contains("\"tool_choice\":\"auto\"");
         }

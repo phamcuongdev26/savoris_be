@@ -1,5 +1,6 @@
 package com.savoris.ai;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.savoris.configuration.AiProperties;
@@ -62,8 +63,11 @@ public class OpenAiCompatibleClient implements AiModelClient {
             if (message.isMissingNode()) throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
             List<AiToolCall> calls = new ArrayList<>();
             for (JsonNode call : message.path("tool_calls")) {
+                Map<String, Object> extraContent = call.path("extra_content").isObject()
+                    ? mapper.convertValue(call.path("extra_content"), new TypeReference<Map<String, Object>>() {})
+                    : Map.of();
                 calls.add(new AiToolCall(call.path("id").asText(), call.path("function").path("name").asText(),
-                    call.path("function").path("arguments").asText("{}")));
+                    call.path("function").path("arguments").asText("{}"), extraContent));
             }
             JsonNode content = message.path("content");
             return new AiCompletion(content.isNull() || content.isMissingNode() ? null : content.asText(), List.copyOf(calls));

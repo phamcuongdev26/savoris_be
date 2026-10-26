@@ -8,5 +8,9 @@ public interface AiModelClient {
     AiCompletion complete(List<Map<String, Object>> messages, List<Map<String, Object>> tools, boolean jsonMode);
 
     record AiCompletion(String content, List<AiToolCall> toolCalls) {}
-    record AiToolCall(String id, String name, String argumentsJson) {}
+    record AiToolCall(String id, String name, String argumentsJson, Map<String, Object> extraContent) {
+        public AiToolCall(String id, String name, String argumentsJson) {
+            this(id, name, argumentsJson, Map.of());
+        }
+    }
 }

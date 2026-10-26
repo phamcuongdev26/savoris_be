@@ -64,7 +64,14 @@ public class AiChatService {
             }
             List<Map<String, Object>> calls = new ArrayList<>();
             for (AiModelClient.AiToolCall call : completion.toolCalls()) {
-                calls.add(Map.of("id", call.id(), "type", "function", "function", Map.of("name", call.name(), "arguments", call.argumentsJson())));
+                Map<String, Object> toolCall = new LinkedHashMap<>();
+                toolCall.put("id", call.id());
+                toolCall.put("type", "function");
+                toolCall.put("function", Map.of("name", call.name(), "arguments", call.argumentsJson()));
+                if (call.extraContent() != null && !call.extraContent().isEmpty()) {
+                    toolCall.put("extra_content", call.extraContent());
+                }
+                calls.add(toolCall);
             }
             Map<String, Object> assistant = new LinkedHashMap<>();
             assistant.put("role", "assistant");

@@ -6,17 +6,46 @@ import com.savoris.dto.request.AiChatRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AiChatServiceTest {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void preservesProviderToolCallMetadataWhenSendingToolResultsBack() {
+        AiModelClient ai = mock(AiModelClient.class);
+        GuestTakeawayService guestService = mock(GuestTakeawayService.class);
+        ReservationService reservationService = mock(ReservationService.class);
+        Map<String, Object> extraContent = Map.of("google", Map.of("thought_signature", "sig-1"));
+        when(ai.isConfigured()).thenReturn(true);
+        when(guestService.getBranches()).thenReturn(List.of());
+        when(ai.complete(anyList(), anyList(), anyBoolean()))
+            .thenReturn(new AiModelClient.AiCompletion(null, List.of(
+                new AiModelClient.AiToolCall("call-1", "get_branches", "{}", extraContent))))
+            .thenReturn(new AiModelClient.AiCompletion("Có chi nhánh Hoàn Kiếm.", List.of()));
+
+        AiChatService service = new AiChatService(ai, guestService, reservationService, new ObjectMapper());
+        service.chat(new AiChatRequest("Có chi nhánh nào?", List.of()));
+
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(ai, times(2)).complete(messages.capture(), anyList(), anyBoolean());
+        Map<String, Object> assistant = messages.getAllValues().get(1).stream()
+            .filter(message -> "assistant".equals(message.get("role"))).findFirst().orElseThrow();
+        List<Map<String, Object>> calls = (List<Map<String, Object>>) assistant.get("tool_calls");
+        assertThat(calls.get(0)).containsEntry("extra_content", extraContent);
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"Đừng đặt bàn giúp tôi", "I won't book a table", "I will not book a table", "I do not want to book a table"})
