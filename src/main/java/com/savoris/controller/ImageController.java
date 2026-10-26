@@ -48,7 +48,7 @@ public class ImageController {
     }
 
     @PostMapping(path = "/site", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     @Operation(summary = "Tải ảnh trang web lên", description = "Form-data field \"file\": PNG, JPEG hoặc WebP, tối đa 5MB. Trả về link ảnh trên Cloudinary")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UploadedImage> uploadSiteImage(@RequestParam("file") MultipartFile file) throws IOException {

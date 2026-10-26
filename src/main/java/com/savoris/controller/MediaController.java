@@ -32,7 +32,7 @@ public class MediaController {
     public record UploadedMedia(String url, String alt) {}
 
     @PostMapping(path = "/admin/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(Roles.ADMIN)
+    @PreAuthorize(Roles.MANAGEMENT)
     public ResponseEntity<UploadedMedia> upload(@RequestParam("file") MultipartFile file, @RequestParam("alt") String alt) throws IOException {
         if (alt == null || alt.isBlank()) throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng nhập mô tả ảnh");
         byte[] bytes = file.getBytes();
