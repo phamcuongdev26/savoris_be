@@ -1,4 +1,4 @@
-package com.savoris.service;
+package com.savoris.service.impl;
 
 import com.savoris.repository.CodeSequenceRepository;
 import lombok.RequiredArgsConstructor;

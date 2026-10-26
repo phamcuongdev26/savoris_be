@@ -5,7 +5,7 @@ import com.savoris.dto.request.ResetPasswordRequest;
 import com.savoris.dto.request.UpdateStaffRequest;
 import com.savoris.dto.response.StaffDetailResponse;
 import com.savoris.dto.response.ErrorResponse;
-import com.savoris.service.AuditLogger;
+import com.savoris.service.impl.AuditLogger;
 import com.savoris.service.StaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

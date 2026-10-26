@@ -3,7 +3,7 @@ package com.savoris.controller;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.security.CurrentUser;
 import com.savoris.security.Roles;
-import com.savoris.service.KitchenEventStreamRegistry;
+import com.savoris.service.impl.KitchenEventStreamRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

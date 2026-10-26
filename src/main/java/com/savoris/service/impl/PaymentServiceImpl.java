@@ -17,7 +17,6 @@ import com.savoris.repository.PaymentRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.service.SettingService;
 import com.savoris.service.PaymentService;
-import com.savoris.service.KitchenQueueEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

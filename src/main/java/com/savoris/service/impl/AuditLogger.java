@@ -1,4 +1,4 @@
-package com.savoris.service;
+package com.savoris.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;

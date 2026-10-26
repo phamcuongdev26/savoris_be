@@ -1,4 +1,4 @@
-package com.savoris.service;
+package com.savoris.service.impl;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;

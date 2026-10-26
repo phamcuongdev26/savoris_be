@@ -16,7 +16,6 @@ import com.savoris.repository.OrderRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.notification.TakeawayNotifier;
 import com.savoris.service.KitchenService;
-import com.savoris.service.KitchenQueueEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

@@ -12,7 +12,6 @@ import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
 import com.savoris.repository.ReservationRepository;
 import com.savoris.security.BranchAccessGuard;
-import com.savoris.service.AuditLogger;
 import com.savoris.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

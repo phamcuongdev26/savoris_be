@@ -1,6 +1,6 @@
 package com.savoris.event;
 
-import com.savoris.service.KitchenEventStreamRegistry;
+import com.savoris.service.impl.KitchenEventStreamRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
