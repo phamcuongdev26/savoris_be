@@ -63,6 +63,23 @@ class SecurityRulesTest extends IntegrationTestSupport {
     }
 
     @Test
+    void managerCanReactivateStaffOnlyInTheirOwnBranch() throws Exception {
+        waiter.setStatus(StaffStatus.LOCKED);
+        staffRepository.save(waiter);
+        StaffEntity otherBranchStaff = createStaff(StaffRole.STAFF, createBranch(null));
+        otherBranchStaff.setStatus(StaffStatus.LOCKED);
+        staffRepository.save(otherBranchStaff);
+
+        mockMvc.perform(put("/staff/" + waiter.getId() + "/activate").with(as(manager)))
+            .andExpect(status().isNoContent());
+        assertTrue(staffRepository.findById(waiter.getId()).orElseThrow().getStatus() == StaffStatus.ACTIVE);
+
+        mockMvc.perform(put("/staff/" + otherBranchStaff.getId() + "/activate").with(as(manager)))
+            .andExpect(status().isForbidden());
+        assertTrue(staffRepository.findById(otherBranchStaff.getId()).orElseThrow().getStatus() == StaffStatus.LOCKED);
+    }
+
+    @Test
     void managerHiresOnlyFloorAndKitchenStaff_forTheirOwnBranch() throws Exception {
         mockMvc.perform(post("/staff").with(as(manager)).contentType(MediaType.APPLICATION_JSON)
                 .content(staffJson("STAFF", branch)))
