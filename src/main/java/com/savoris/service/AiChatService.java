@@ -23,9 +23,12 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class AiChatService {
-    private static final String SYSTEM = "Bạn là trợ lý ảo của nhà hàng Savoris, chuỗi nhà hàng Việt Nam tại Hà Nội. "
-        + "Trả lời ngắn gọn, thân thiện bằng tiếng Việt. Dùng tools để lấy dữ liệu chi nhánh, menu, giờ đặt bàn; "
-        + "không được tự bịa thông tin. Nếu thiếu thông tin thì hỏi lại. Không tạo đặt bàn khi khách phủ định hoặc chỉ hỏi về việc đặt bàn. Chỉ tạo đặt bàn khi khách yêu cầu đặt bàn rõ ràng trong tin nhắn mới nhất. "
+    private static final String SYSTEM = "Bạn là AI Agent hỗ trợ khách hàng trên website Savoris, chuỗi nhà hàng Việt Nam tại Hà Nội. "
+        + "Xử lý câu hỏi tự do như một nhân viên hỗ trợ trực tuyến: xác định ý khách, trả lời trực tiếp, ngắn gọn, thân thiện bằng tiếng Việt; "
+        + "hướng dẫn từng bước khi cần và chỉ hỏi lại thông tin còn thiếu. Không hỏi khách xác nhận câu trả lời đã giải quyết vấn đề chưa. "
+        + "Dùng tools để lấy dữ liệu chi nhánh, menu, giờ đặt bàn; không được tự bịa thông tin. Nếu thiếu thông tin thì nói rõ giới hạn và hướng khách tới nhân viên. "
+        + "Không khẳng định trạng thái đơn hàng hoặc giao dịch vì trợ lý chưa có công cụ tra dữ liệu đơn hàng. "
+        + "Không tạo đặt bàn khi khách phủ định hoặc chỉ hỏi về việc đặt bàn. Chỉ tạo đặt bàn khi khách yêu cầu đặt bàn rõ ràng trong tin nhắn mới nhất. "
         + "Chỉ xác nhận đã đặt bàn khi tool create_reservation trả về mã đặt bàn.\n\n"
         + com.savoris.ai.SavorisKnowledge.CONTEXT;
     private static final Pattern BOOKING_INTENT = Pattern.compile("(?:đặt\\s*(?:bàn|chỗ)|book\\s+(?:a\\s+)?table)");
@@ -46,8 +49,10 @@ public class AiChatService {
     private final ObjectMapper mapper;
 
     public AiChatResponse chat(AiChatRequest request) {
-        var faq = faqService.answer(request.message());
-        if (faq.isPresent()) return new AiChatResponse(faq.get());
+        if (!Boolean.TRUE.equals(request.agentMode())) {
+            var faq = faqService.answer(request.message());
+            if (faq.isPresent()) return new AiChatResponse(faq.get());
+        }
         if (!ai.isConfigured()) throw new AppException(ErrorCode.AI_NOT_CONFIGURED);
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", SYSTEM));

@@ -3,6 +3,7 @@ package com.savoris.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.savoris.ai.AiModelClient;
 import com.savoris.dto.request.AiChatRequest;
+import com.savoris.dto.response.AiChatResponse;
 import com.savoris.dto.response.PublicBranchResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,11 +61,28 @@ class AiChatServiceTest {
         ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
         verify(ai, times(2)).complete(messages.capture(), anyList(), anyBoolean());
         assertThat(messages.getAllValues().get(0).get(0).get("content").toString())
-            .contains("Kiến thức Savoris đã xác minh", "SePay", "không suy đoán");
+            .contains("Kiến thức Savoris đã xác minh", "SePay", "không suy đoán", "AI Agent", "dữ liệu đơn hàng");
         Map<String, Object> assistant = messages.getAllValues().get(1).stream()
             .filter(message -> "assistant".equals(message.get("role"))).findFirst().orElseThrow();
         List<Map<String, Object>> calls = (List<Map<String, Object>>) assistant.get("tool_calls");
         assertThat(calls.get(0)).containsEntry("extra_content", extraContent);
+    }
+
+    @Test
+    void agentModeRoutesEvenFaqLikeQuestionsThroughTheAiAgent() {
+        AiModelClient ai = mock(AiModelClient.class);
+        GuestTakeawayService guestService = mock(GuestTakeawayService.class);
+        ReservationService reservationService = mock(ReservationService.class);
+        when(ai.isConfigured()).thenReturn(true);
+        when(ai.complete(anyList(), anyList(), anyBoolean()))
+            .thenReturn(new AiModelClient.AiCompletion("Mình sẽ giúp bạn tìm thông tin phù hợp.", List.of()));
+
+        AiChatService service = new AiChatService(ai, new AiFaqService(guestService, reservationService), guestService, reservationService, new ObjectMapper());
+        AiChatResponse response = service.chat(new AiChatRequest("Thông tin chi nhánh và giờ mở cửa", List.of(), true));
+
+        assertThat(response.reply()).contains("giúp bạn");
+        verify(ai).complete(anyList(), anyList(), anyBoolean());
+        verify(guestService, never()).getBranches();
     }
 
     @ParameterizedTest

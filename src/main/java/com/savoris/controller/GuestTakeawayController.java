@@ -1,9 +1,11 @@
 package com.savoris.controller;
 
 import com.savoris.dto.request.WebTakeawayRequest;
+import com.savoris.dto.request.TakeawayEstimateRequest;
 import com.savoris.dto.response.GuestTableResponse;
 import com.savoris.dto.response.PublicBranchResponse;
 import com.savoris.dto.response.WebTakeawayResponse;
+import com.savoris.dto.response.TakeawayEstimateResponse;
 import com.savoris.service.GuestTakeawayService;
 import com.savoris.service.SettingService;
 import org.springframework.http.CacheControl;
@@ -54,6 +56,12 @@ public class GuestTakeawayController {
     @Operation(summary = "Menu mang về của chi nhánh", description = "Giá riêng và món hết của chi nhánh")
     public ResponseEntity<GuestTableResponse> getBranchMenu(@PathVariable Integer branchId) {
         return ResponseEntity.ok(guestTakeawayService.getBranchMenu(branchId));
+    }
+
+    @PostMapping("/takeaway-orders/estimate")
+    @Operation(summary = "Ước tính giờ nhận món mang về theo tải bếp và các món đã chọn")
+    public ResponseEntity<TakeawayEstimateResponse> estimatePickup(@Valid @RequestBody TakeawayEstimateRequest request) {
+        return ResponseEntity.ok(guestTakeawayService.estimatePickup(request.branchId(), request.items()));
     }
 
     @PostMapping("/takeaway-orders")

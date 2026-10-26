@@ -83,6 +83,9 @@ public class OrderItemEntity {
     @Column(name = "ready_at")
     private LocalDateTime readyAt;
 
+    @Column(name = "cooking_started_at")
+    private LocalDateTime cookingStartedAt;
+
     // Ordered by the guest through the table QR, not by a member of staff
     @Column(name = "ordered_by_guest", nullable = false)
     private Boolean orderedByGuest = false;

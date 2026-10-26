@@ -47,6 +47,27 @@ class WebTakeawayTest extends IntegrationTestSupport {
     }
 
     @Test
+    void estimatesPickupFromTheSelectedBranchAndKitchenHistory() throws Exception {
+        mockMvc.perform(post("/public/takeaway-orders/estimate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"branchId\":" + branch.getId() + ",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estimatedMinutes").isNumber())
+            .andExpect(jsonPath("$.pickupAt").isNotEmpty())
+            .andExpect(jsonPath("$.closingTime").value("23:59"))
+            .andExpect(jsonPath("$.canAccept").value(true));
+    }
+
+    @Test
+    void refusesEstimateForDishNotOfferedAtSelectedBranch() throws Exception {
+        jdbcTemplate.update("insert into branch_menu_items (branch_id, menu_item_id, is_available, offered) values (?, ?, true, false)",
+            branch.getId(), pho.getId());
+
+        mockMvc.perform(post("/public/takeaway-orders/estimate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"branchId\":" + branch.getId() + ",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":1}]}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void cashOrderWaitsOutsideTheKitchenUntilTheCashierTakesTheMoney() throws Exception {
         String placed = order("CASH").andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))

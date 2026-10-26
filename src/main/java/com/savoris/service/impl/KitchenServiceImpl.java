@@ -125,7 +125,10 @@ public class KitchenServiceImpl implements KitchenService {
 
         OrderItemEntity updated = orderItemRepository.findById(itemId).orElseThrow();
         switch (to) {
-            case COOKING -> updated.setCookedBy(staffId);
+            case COOKING -> {
+                updated.setCookedBy(staffId);
+                updated.setCookingStartedAt(now);
+            }
             case READY -> updated.setReadyAt(now);
             case SERVED -> updated.setServedBy(staffId);
             default -> { }
