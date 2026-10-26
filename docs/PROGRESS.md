@@ -180,6 +180,49 @@ a6d23c1  B2.1: Fix opening_hour persist (500→correct errors) and add week upse
 7d84745  B2.2: Translate all client-facing ErrorCode messages to Vietnamese
 ```
 
+### Permission matrix check — thực tế vs. yêu cầu (commit b10b41e)
+
+Đọc từ code (Roles.java + tất cả @PreAuthorize + BranchAccessGuard):
+
+| Capability | ADMIN | MANAGER | STAFF | CHEF | Ghi chú |
+|---|---|---|---|---|---|
+| Kitchen ops (start/ready/void-resolve) | ✓ | ✓ | – | ✓ | Roles.KITCHEN ✓ |
+| Mark dish sold out | ✓ | ✓ | – | ✓ | Roles.KITCHEN ✓ |
+| Edit dishes/prices/categories | ✓ | – | – | – | Roles.ADMIN ✓ |
+| Tables & areas (write) | ✓ | ✓ | – | – | Roles.MANAGEMENT ✓ |
+| POS, serving, payment | ✓ | ✓ | ✓ | – | Roles.ORDER_WRITE/PAYMENT ✓ |
+| Reservations: create, confirm, cancel | ✓ | ✓ | ✓ | – | Roles.FRONT_OF_HOUSE ✓ |
+| Branch details / hours (write) | ✓ | ✓ | – | – | Roles.MANAGEMENT ✓ |
+| Pause/resume takeaway | – | – | – | – | Pending B3 ✓ |
+| Staff accounts (write) | ✓ | ✓ | – | – | MANAGEMENT + service rules ✓ |
+| Chain-wide reports | ✓ | – | – | – | Roles.ADMIN ✓ |
+| Branch reports | ✓ | ✓ | – | – | Roles.MANAGEMENT ✓ |
+| Website homepage (write) | ✓ | – | – | – | Roles.ADMIN ✓ |
+| Website branch page + image upload | ✓ | **FIX** | – | – | **MISMATCH → fixed** |
+
+**Mismatch tìm thấy (1 loại, 2 endpoint):**
+- `POST /images/site` (ImageController) → ADMIN-only → đổi sang `Roles.MANAGEMENT`
+- `POST /admin/media` (MediaController) → ADMIN-only → đổi sang `Roles.MANAGEMENT`
+
+`DELETE /admin/media/{name}` giữ nguyên ADMIN để tránh MANAGER xóa ảnh của chi nhánh khác.
+
+**Commit fix:** `b10b41e — B2 fix: allow MANAGER to upload site/gallery images`  
+**Codex b10b41e:** "Không phát hiện lỗi chức năng hoặc bảo mật mới."
+
+### Kết quả test sau permission fix
+`mvn test`: **81 pass, 1 skip**
+
+| Test class | Sau fix | Ghi chú |
+|---|---|---|
+| ImageUploadTest | 3 | +managerCanUploadSiteAndLocalImages_butNotStaffOrChef |
+| Tất cả còn lại | — | Không thay đổi |
+
+### Shell status
+- Dev server (PID 49658): đang chạy trên local — giữ lại
+- Codex processes: chạy trong các terminal riêng — không ảnh hưởng
+
+---
+
 ## B3 — CHƯA BẮT ĐẦU
 
 - Branch-level config columns cho peak hour (reservation_slot_guests, takeaway_paused, …)
