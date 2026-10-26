@@ -15,7 +15,6 @@ import com.savoris.repository.OrderItemRepository;
 import com.savoris.repository.OrderRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.notification.TakeawayNotifier;
-import com.savoris.service.InventoryService;
 import com.savoris.service.KitchenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +49,6 @@ public class KitchenServiceImpl implements KitchenService {
     private final OrderRepository orderRepository;
     private final BranchRepository branchRepository;
     private final BranchAccessGuard branchAccessGuard;
-    private final InventoryService inventoryService;
     private final TakeawayNotifier takeawayNotifier;
 
     @Value("${savoris.kitchen.default-capacity:40}")
@@ -126,10 +124,7 @@ public class KitchenServiceImpl implements KitchenService {
 
         OrderItemEntity updated = orderItemRepository.findById(itemId).orElseThrow();
         switch (to) {
-            case COOKING -> {
-                updated.setCookedBy(staffId);
-                inventoryService.deductForDish(order.getBranchId(), updated, staffId);
-            }
+            case COOKING -> updated.setCookedBy(staffId);
             case READY -> updated.setReadyAt(now);
             case SERVED -> updated.setServedBy(staffId);
             default -> { }

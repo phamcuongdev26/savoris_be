@@ -5,7 +5,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,14 +24,6 @@ public class CreateOrderRequest {
     private OrderType orderType;
 
     private Integer tableId;
-    private Integer customerId;
-
-    // Optional promotion code typed in by the cashier
-    private String promotionCode;
-
-    // Loyalty points the customer wants to spend on this order (needs customerId)
-    @PositiveOrZero(message = "Points must not be negative")
-    private Integer pointsToUse;
     private String notes;
 
     @NotEmpty(message = "Order must contain at least one item")

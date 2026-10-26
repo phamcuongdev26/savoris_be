@@ -16,7 +16,6 @@ import com.savoris.repository.OrderRepository;
 import com.savoris.repository.PaymentRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.service.SettingService;
-import com.savoris.service.LoyaltyService;
 import com.savoris.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +39,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final BranchAccessGuard branchAccessGuard;
-    private final LoyaltyService loyaltyService;
     private final OrderItemRepository orderItemRepository;
     private final TakeawayNotifier takeawayNotifier;
     private final SettingService settingService;
@@ -176,9 +174,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getStatus() != PaymentStatus.PAID) {
             throw new AppException(ErrorCode.INVALID_STATE, "Payment " + paymentId + " is " + payment.getStatus());
-        }
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            loyaltyService.takeBackEarned(order);
         }
         payment.setStatus(PaymentStatus.REFUNDED);
         payment.setRefundedBy(staffId);

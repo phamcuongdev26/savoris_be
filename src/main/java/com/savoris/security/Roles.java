@@ -18,8 +18,8 @@ public final class Roles {
     // Everyone in the restaurant permission matrix: admin, manager, front of house, chef
     public static final String RESTAURANT = "hasAnyRole('ADMIN','MANAGER','STAFF','CHEF')";
     public static final String SERVICE = RESTAURANT;
-    // Cooks and owner may move dishes through the kitchen flow
-    public static final String KITCHEN = "hasAnyRole('ADMIN','CHEF')";
+    // Cooks, branch managers, and owner may work the kitchen and mark dishes as sold out
+    public static final String KITCHEN = "hasAnyRole('ADMIN','MANAGER','CHEF')";
     // Warehouse staff handle stock at their own branch; branch scope is enforced in services.
     public static final String STOCK = "hasAnyRole('ADMIN','MANAGER')";
     public static final String STOCK_READ = "hasAnyRole('ADMIN','MANAGER')";

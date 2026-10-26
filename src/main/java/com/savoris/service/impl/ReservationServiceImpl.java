@@ -1,23 +1,24 @@
 package com.savoris.service.impl;
 
 import com.savoris.constant.ReservationStatus;
+import com.savoris.constant.StaffRole;
 import com.savoris.dto.request.CreateReservationRequest;
 import com.savoris.dto.request.GuestReservationRequest;
 import com.savoris.dto.response.ReservationResponse;
 import com.savoris.dto.response.SlotAvailabilityResponse;
 import com.savoris.entity.ReservationEntity;
-import com.savoris.repository.ReservationRepository;
-import com.savoris.service.ReservationService;
+import com.savoris.entity.StaffEntity;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
-import com.savoris.entity.CustomerEntity;
-import com.savoris.repository.CustomerRepository;
+import com.savoris.repository.ReservationRepository;
 import com.savoris.security.BranchAccessGuard;
+import com.savoris.service.AuditLogger;
+import com.savoris.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,33 +31,70 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
 
+    // NOTE: MAX_GUESTS_SLOT will move to branch config (reservation_slot_guests) in B3.1
+    private static final int SLOT_MINUTES    = 30;
+    private static final int MAX_GUESTS_SLOT = 40;
+
     private final ReservationRepository reservationRepository;
-    private final CustomerRepository customerRepository;
     private final BranchAccessGuard branchAccessGuard;
+    private final AuditLogger auditLogger;
     private final JdbcTemplate jdbc;
 
     @Override
     @Transactional
     public ReservationResponse createReservation(Integer staffId, CreateReservationRequest request) {
-        branchAccessGuard.check(staffId, request.getBranchId());
-        CustomerEntity customer = customerRepository.findById(request.getCustomerId())
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Customer not found: " + request.getCustomerId()));
+        StaffEntity staff = branchAccessGuard.check(staffId, request.getBranchId());
+        boolean override = Boolean.TRUE.equals(request.getOverrideCapacity());
+        if (override) {
+            StaffRole role = staff.getRole();
+            if (role != StaffRole.ADMIN && role != StaffRole.MANAGER) {
+                throw new AppException(ErrorCode.FORBIDDEN, "Chỉ MANAGER hoặc ADMIN mới có thể vượt sức chứa khung giờ");
+            }
+        }
+        return ReservationResponse.from(doCreate(
+            request.getBranchId(), request.getCustomerName(), request.getCustomerPhone(),
+            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), staffId,
+            override));
+    }
 
-        ReservationEntity reservation = new ReservationEntity();
-        reservation.setBranchId(request.getBranchId());
-        reservation.setCustomerId(customer.getId());
-        // Walk-in customers may be registered with a phone number only
-        reservation.setCustomerName(customer.getFullName() != null ? customer.getFullName() : customer.getPhone());
-        reservation.setCustomerPhone(customer.getPhone());
-        reservation.setGuestCount(request.getNumberOfGuests());
-        reservation.setReservedAt(request.getReservationDate());
-        reservation.setNote(request.getNotes());
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setCreatedBy(staffId);
+    @Override
+    @Transactional
+    public ReservationResponse createGuestReservation(GuestReservationRequest request) {
+        return ReservationResponse.from(doCreate(
+            request.getBranchId(), request.getGuestName(), request.getGuestPhone(),
+            request.getNumberOfGuests(), request.getReservationDate(), request.getNotes(), null, false));
+    }
 
-        ReservationEntity saved = reservationRepository.save(reservation);
-        log.info("Created reservation: {} for date: {}", saved.getId(), request.getReservationDate());
-        return ReservationResponse.from(saved);
+    private ReservationEntity doCreate(Integer branchId, String customerName, String customerPhone,
+            int guestCount, LocalDateTime reservationDate, String notes, Integer createdBy, boolean overrideCapacity) {
+        LocalDateTime slot = reservationDate.withSecond(0).withNano(0);
+        validateOpeningHours(branchId, slot);
+        LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
+        int booked = reservationRepository
+            .findByBranchIdAndReservedAtBetweenAndStatusNotIn(branchId, slot, slotEnd,
+                List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
+            .stream().mapToInt(ReservationEntity::getGuestCount).sum();
+        boolean overflow = booked + guestCount > MAX_GUESTS_SLOT;
+        if (overflow && !overrideCapacity) {
+            throw new AppException(ErrorCode.INVALID_STATE,
+                "Khung giờ " + slot.toLocalTime() + " đã hết chỗ. Vui lòng chọn khung khác.");
+        }
+        ReservationEntity entity = new ReservationEntity();
+        entity.setBranchId(branchId);
+        entity.setCustomerName(customerName);
+        entity.setCustomerPhone(customerPhone);
+        entity.setGuestCount(guestCount);
+        entity.setReservedAt(reservationDate);
+        entity.setNote(notes);
+        entity.setStatus(ReservationStatus.PENDING);
+        entity.setCreatedBy(createdBy);
+        ReservationEntity saved = reservationRepository.save(entity);
+        if (overflow) {
+            auditLogger.log(createdBy, branchId, "CAPACITY_OVERRIDE", "RESERVATION", saved.getId(),
+                null, "{\"booked\":" + booked + ",\"added\":" + guestCount + ",\"max\":" + MAX_GUESTS_SLOT + "}");
+        }
+        log.info("Reservation {} for branch {} at {}", saved.getId(), branchId, slot);
+        return saved;
     }
 
     @Override
@@ -70,7 +108,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse confirmReservation(Integer staffId, Integer reservationId) {
         ReservationEntity reservation = findAccessible(staffId, reservationId);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Reservation is already " + reservation.getStatus());
+            throw new AppException(ErrorCode.INVALID_STATE, "Đặt bàn đã ở trạng thái " + reservation.getStatus());
         }
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservation.setUpdatedAt(LocalDateTime.now());
@@ -84,7 +122,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse cancelReservation(Integer staffId, Integer reservationId) {
         ReservationEntity reservation = findAccessible(staffId, reservationId);
         if (reservation.getStatus() != ReservationStatus.PENDING && reservation.getStatus() != ReservationStatus.CONFIRMED) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Reservation is already " + reservation.getStatus());
+            throw new AppException(ErrorCode.INVALID_STATE, "Đặt bàn đã ở trạng thái " + reservation.getStatus());
         }
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setUpdatedAt(LocalDateTime.now());
@@ -98,7 +136,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse markNoShow(Integer staffId, Integer reservationId) {
         ReservationEntity reservation = findAccessible(staffId, reservationId);
         if (reservation.getStatus() != ReservationStatus.PENDING && reservation.getStatus() != ReservationStatus.CONFIRMED) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Only pending or confirmed reservations can be marked no-show");
+            throw new AppException(ErrorCode.INVALID_STATE, "Chỉ đặt bàn đang chờ hoặc đã xác nhận mới có thể đánh dấu không đến");
         }
         reservation.setStatus(ReservationStatus.NO_SHOW);
         reservation.setUpdatedAt(LocalDateTime.now());
@@ -109,37 +147,26 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public List<ReservationResponse> getReservationsByBranch(Integer staffId, Integer branchId) {
         branchAccessGuard.check(staffId, branchId);
-        return reservationRepository.findByBranchId(branchId)
-            .stream()
+        return reservationRepository.findByBranchId(branchId).stream()
             .map(ReservationResponse::from)
             .toList();
     }
 
-    private ReservationEntity findAccessible(Integer staffId, Integer reservationId) {
-        ReservationEntity reservation = reservationRepository.findById(reservationId)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Reservation not found: " + reservationId));
-        branchAccessGuard.check(staffId, reservation.getBranchId());
-        return reservation;
-    }
-
     @Override
-    public List<ReservationResponse> getReservationsByCustomer(Integer customerId) {
-        return reservationRepository.findByCustomerId(customerId)
-            .stream()
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> searchByPhone(Integer staffId, Integer branchId, String phone) {
+        branchAccessGuard.check(staffId, branchId);
+        return reservationRepository.findByBranchIdAndCustomerPhone(branchId, phone).stream()
             .map(ReservationResponse::from)
             .toList();
     }
 
     // ── Public slot availability ─────────────────────────────────────────────
 
-    private static final int SLOT_MINUTES     = 30;
-    private static final int MAX_GUESTS_SLOT  = 40;
-
     @Override
     @Transactional(readOnly = true)
     public List<SlotAvailabilityResponse> getAvailableSlots(Integer branchId, LocalDate date) {
         List<LocalDateTime> slots = generateSlots(branchId, date);
-
         List<SlotAvailabilityResponse> result = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
@@ -149,18 +176,11 @@ public class ReservationServiceImpl implements ReservationService {
                 .findByBranchIdAndReservedAtBetweenAndStatusNotIn(branchId, slot, slotEnd,
                     List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
                 .stream().mapToInt(ReservationEntity::getGuestCount).sum();
-
             boolean available = booked < MAX_GUESTS_SLOT && slot.isAfter(now);
-
             result.add(SlotAvailabilityResponse.builder()
-                .slotTime(slot)
-                .bookedGuests(booked)
-                .maxCapacity(MAX_GUESTS_SLOT)
-                .available(available)
-                .build());
+                .slotTime(slot).bookedGuests(booked).maxCapacity(MAX_GUESTS_SLOT).available(available).build());
         }
 
-        // Fill suggestedAlternative: for each full slot, point to the next available one
         for (int i = 0; i < result.size(); i++) {
             if (!result.get(i).isAvailable()) {
                 for (int j = i + 1; j < result.size(); j++) {
@@ -192,39 +212,9 @@ public class ReservationServiceImpl implements ReservationService {
         return slots;
     }
 
-    @Override
-    @Transactional
-    public ReservationResponse createGuestReservation(GuestReservationRequest request) {
-        // Validate slot availability
-        LocalDateTime slot = request.getReservationDate().withSecond(0).withNano(0);
-        validateOpeningHours(request.getBranchId(), slot);
-        LocalDateTime slotEnd = slot.plusMinutes(SLOT_MINUTES);
-        int booked = reservationRepository
-            .findByBranchIdAndReservedAtBetweenAndStatusNotIn(request.getBranchId(), slot, slotEnd,
-                List.of(ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW))
-            .stream().mapToInt(ReservationEntity::getGuestCount).sum();
-        if (booked + request.getNumberOfGuests() > MAX_GUESTS_SLOT) {
-            throw new AppException(ErrorCode.INVALID_STATE,
-                "Slot " + slot + " is full. Please choose another time.");
-        }
-
-        ReservationEntity entity = new ReservationEntity();
-        entity.setBranchId(request.getBranchId());
-        entity.setCustomerName(request.getGuestName());
-        entity.setCustomerPhone(request.getGuestPhone());
-        entity.setGuestCount(request.getNumberOfGuests());
-        entity.setReservedAt(request.getReservationDate());
-        entity.setNote(request.getNotes());
-        entity.setStatus(ReservationStatus.PENDING);
-
-        ReservationEntity saved = reservationRepository.save(entity);
-        log.info("Guest reservation {} for branch {} at {}", saved.getId(), request.getBranchId(), slot);
-        return ReservationResponse.from(saved);
-    }
-
     private void validateOpeningHours(Integer branchId, LocalDateTime slot) {
         if (slot.getSecond() != 0 || slot.getNano() != 0 || slot.getMinute() % SLOT_MINUTES != 0) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Vui lòng chọn giờ theo khung 30 phút");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng chọn giờ theo khung 30 phút");
         }
         int weekday = slot.getDayOfWeek().getValue();
         List<LocalTime[]> windows = jdbc.query(
@@ -235,7 +225,14 @@ public class ReservationServiceImpl implements ReservationService {
         boolean inHours = windows.stream().anyMatch(window -> !time.isBefore(window[0])
             && !time.plusMinutes(SLOT_MINUTES).isAfter(window[1]));
         if (!slot.isAfter(LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))) || !inHours) {
-            throw new AppException(ErrorCode.INVALID_STATE, "Giờ đặt bàn nằm ngoài giờ hoạt động của chi nhánh");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Giờ đặt bàn nằm ngoài giờ hoạt động của chi nhánh");
         }
+    }
+
+    private ReservationEntity findAccessible(Integer staffId, Integer reservationId) {
+        ReservationEntity reservation = reservationRepository.findById(reservationId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không tìm thấy đặt bàn: " + reservationId));
+        branchAccessGuard.check(staffId, reservation.getBranchId());
+        return reservation;
     }
 }

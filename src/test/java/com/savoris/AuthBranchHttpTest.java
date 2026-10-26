@@ -75,18 +75,13 @@ class AuthBranchHttpTest {
         refreshTokens.deleteAll();
         jdbc.update("delete from audit_logs");
         jdbc.update("update branches set manager_id=null");
+        jdbc.update("delete from reservations");
         staff.deleteAll();
         jdbc.update("delete from branch_page");
-        jdbc.update("delete from testimonial");
-        jdbc.update("delete from accolade");
         jdbc.update("delete from gallery_image");
-        jdbc.update("delete from offer");
-        jdbc.update("delete from menu_file");
         jdbc.update("delete from payments");
-        jdbc.update("delete from point_transactions");
         jdbc.update("delete from order_items");
         jdbc.update("delete from orders");
-        jdbc.update("delete from reservations");
         jdbc.update("delete from branch_menu_items");
         jdbc.update("delete from code_sequences");
         jdbc.update("delete from opening_hour");
@@ -219,7 +214,7 @@ class AuthBranchHttpTest {
         assertFalse(slots.body().contains(tomorrow.atTime(16, 0).toString()));
 
         String invalid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(16, 0) + "\",\"numberOfGuests\":2}";
-        assertEquals(409, exchange(HttpMethod.POST, "/reservations/guest", invalid, null).statusCode());
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations/guest", invalid, null).statusCode());
         String valid = "{\"branchId\":" + cn1.getId() + ",\"guestName\":\"Khách demo\",\"guestPhone\":\"0912345678\",\"reservationDate\":\"" + tomorrow.atTime(15, 30) + "\",\"numberOfGuests\":2}";
         HttpResponse<String> created = exchange(HttpMethod.POST, "/reservations/guest", valid, null);
         assertEquals(201, created.statusCode());
@@ -234,6 +229,46 @@ class AuthBranchHttpTest {
         assertTrue(exchange(HttpMethod.GET,
             "/reservations/branch/" + cn1.getId() + "?date=" + tomorrow + "&status=NO_SHOW", null, adminCookie).body()
             .contains("\"id\":" + reservationId));
+    }
+
+    @Test
+    void staffReservationValidationAndCapacityOverride() throws Exception {
+        int uid = IDS.incrementAndGet();
+        StaffEntity staffUser = user("staff-res-" + uid, StaffRole.STAFF, cn1, StaffStatus.ACTIVE);
+        String staffCookie  = accessCookie(login("staff-res-" + uid, "Correct@123"));
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+
+        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1);
+        int weekday = tomorrow.getDayOfWeek().getValue();
+        // Opening window: 15:00 – 15:30 (single slot)
+        jdbc.update("insert into opening_hour(branch_id,weekday,opens_at,closes_at,closed) values(?,?,'15:00','15:30',false)",
+            cn1.getId(), weekday);
+        LocalDateTime slot = tomorrow.atTime(15, 0);
+        String base = "\"branchId\":" + cn1.getId() + ",\"customerName\":\"T\",\"customerPhone\":\"0911111111\"";
+
+        // 1. Past date → 400 (Bean Validation @Future)
+        String past = "{" + base + ",\"reservationDate\":\"" + LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).minusDays(1) + "\",\"numberOfGuests\":1}";
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations", past, staffCookie).statusCode());
+
+        // 2. Outside opening hours → 400
+        String outside = "{" + base + ",\"reservationDate\":\"" + tomorrow.atTime(17, 0) + "\",\"numberOfGuests\":1}";
+        assertEquals(400, exchange(HttpMethod.POST, "/reservations", outside, staffCookie).statusCode());
+
+        // 3. Manager fills the slot (40 guests in one booking)
+        String fillBody = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":40}";
+        assertEquals(201, exchange(HttpMethod.POST, "/reservations", fillBody, managerCookie).statusCode());
+
+        String fullSlot = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1}";
+        // 4. Staff đặt khung đầy → 409
+        assertEquals(409, exchange(HttpMethod.POST, "/reservations", fullSlot, staffCookie).statusCode());
+
+        // 5. Staff gửi overrideCapacity=true → 403
+        String staffOverride = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1,\"overrideCapacity\":true}";
+        assertEquals(403, exchange(HttpMethod.POST, "/reservations", staffOverride, staffCookie).statusCode());
+
+        // 6. Manager với overrideCapacity=true → 201
+        String managerOverride = "{" + base + ",\"reservationDate\":\"" + slot + "\",\"numberOfGuests\":1,\"overrideCapacity\":true}";
+        assertEquals(201, exchange(HttpMethod.POST, "/reservations", managerOverride, managerCookie).statusCode());
     }
 
     @Test
@@ -297,6 +332,51 @@ class AuthBranchHttpTest {
         HttpResponse<String> kitchenQueue = exchange(HttpMethod.GET, "/kitchen/branches/" + cn1.getId() + "/queue", null, chefCookie);
         assertEquals(200, kitchenQueue.statusCode());
         assertEquals("[]", kitchenQueue.body().trim());
+    }
+
+    @Test
+    void openingHoursValidationAndUpsert() throws Exception {
+        String adminCookie = accessCookie(login("admin-http", "Correct@123"));
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+        String manager2Cookie = accessCookie(login("manager2-http", "Correct@123"));
+
+        // Valid save for cn1 (weekday 1, 08:00–22:00)
+        String valid = "{\"branchId\":" + cn1.getId() + ",\"weekday\":1,\"opensAt\":\"08:00\",\"closesAt\":\"22:00\",\"closed\":false}";
+        assertEquals(201, exchange(HttpMethod.POST, "/admin/website/hours", valid, adminCookie).statusCode());
+
+        // Duplicate weekday → 409 (unique constraint branch_id+weekday)
+        assertEquals(409, exchange(HttpMethod.POST, "/admin/website/hours", valid, adminCookie).statusCode());
+
+        // Invalid time format → 400
+        String badTime = "{\"branchId\":" + cn1.getId() + ",\"weekday\":2,\"opensAt\":\"25:00\",\"closesAt\":\"22:00\",\"closed\":false}";
+        assertEquals(400, exchange(HttpMethod.POST, "/admin/website/hours", badTime, adminCookie).statusCode());
+
+        // opensAt >= closesAt → 400
+        String badRange = "{\"branchId\":" + cn1.getId() + ",\"weekday\":3,\"opensAt\":\"22:00\",\"closesAt\":\"08:00\",\"closed\":false}";
+        assertEquals(400, exchange(HttpMethod.POST, "/admin/website/hours", badRange, adminCookie).statusCode());
+
+        // MANAGER saves for their own branch → 201
+        String ownBranch = "{\"branchId\":" + cn1.getId() + ",\"weekday\":4,\"opensAt\":\"09:00\",\"closesAt\":\"21:00\",\"closed\":false}";
+        assertEquals(201, exchange(HttpMethod.POST, "/admin/website/hours", ownBranch, managerCookie).statusCode());
+
+        // MANAGER saves for another branch → 403
+        String otherBranch = "{\"branchId\":" + cn2.getId() + ",\"weekday\":5,\"opensAt\":\"09:00\",\"closesAt\":\"21:00\",\"closed\":false}";
+        assertEquals(403, exchange(HttpMethod.POST, "/admin/website/hours", otherBranch, managerCookie).statusCode());
+
+        // Week upsert: cn2 manager saves all 7 days in one call
+        String week = "{\"branchId\":" + cn2.getId() + ",\"days\":["
+            + "{\"weekday\":1,\"opensAt\":\"10:00\",\"closesAt\":\"20:00\",\"closed\":false},"
+            + "{\"weekday\":2,\"closed\":true},"
+            + "{\"weekday\":3,\"opensAt\":\"10:00\",\"closesAt\":\"20:00\",\"closed\":false}"
+            + "]}";
+        HttpResponse<String> weekResp = exchange(HttpMethod.PUT, "/admin/website/hours/week", week, manager2Cookie);
+        assertEquals(200, weekResp.statusCode());
+        // Upsert again (should update, not 409)
+        assertEquals(200, exchange(HttpMethod.PUT, "/admin/website/hours/week", week, manager2Cookie).statusCode());
+
+        // Week upsert for another branch → 403
+        String weekOther = "{\"branchId\":" + cn1.getId() + ",\"days\":[{\"weekday\":6,\"closed\":true}]}";
+        assertEquals(403, exchange(HttpMethod.PUT, "/admin/website/hours/week", weekOther, manager2Cookie).statusCode());
     }
 
     private HttpResponse<String> login(String username, String password) throws Exception {

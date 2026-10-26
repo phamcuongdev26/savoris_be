@@ -36,7 +36,6 @@ class SecurityRulesTest extends IntegrationTestSupport {
     private StaffEntity waiter;
     private StaffEntity cashier;
     private StaffEntity chef;
-    private StaffEntity warehouse;
 
     @BeforeEach
     void setUp() {
@@ -46,7 +45,6 @@ class SecurityRulesTest extends IntegrationTestSupport {
         waiter = createStaff(StaffRole.STAFF, branch);
         cashier = createStaff(StaffRole.STAFF, branch);
         chef = createStaff(StaffRole.CHEF, branch);
-        warehouse = createStaff(StaffRole.STAFF, branch);
     }
 
     private String staffJson(String role, BranchEntity at) {
@@ -96,44 +94,20 @@ class SecurityRulesTest extends IntegrationTestSupport {
         mockMvc.perform(post("/orders").with(as(chef)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
             .andExpect(status().isForbidden());
-        mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
+
+        String orderResp = mockMvc.perform(post("/orders").with(as(cashier)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
-            .andExpect(status().isCreated());
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        int itemId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+            .readTree(orderResp).path("items").get(0).path("id").asInt();
 
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(cashier)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
+        // MANAGER has kitchen access (KITCHEN role now includes MANAGER)
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(manager)))
             .andExpect(status().isOk());
-
-        mockMvc.perform(put("/kitchen/items/1/start").with(as(manager)))
+        // STAFF has no kitchen access (blocked by @PreAuthorize before state check)
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(cashier)))
             .andExpect(status().isForbidden());
-        mockMvc.perform(put("/kitchen/items/1/start").with(as(cashier)))
-            .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void staffCannotManageStock_butManagerIsScopedToOwnBranch() throws Exception {
-        BranchEntity otherBranch = createBranch(null);
-
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(warehouse)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(warehouse)))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/inventory/branch/" + branch.getId()).with(as(manager)))
-            .andExpect(status().isOk());
-        mockMvc.perform(post("/inventory/branch/" + branch.getId() + "/import").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rows\":[{\"name\":\"Rice\",\"unit\":\"kg\",\"quantity\":10,\"minStock\":2}]}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.created").value(1));
-        mockMvc.perform(post("/inventory/branch/" + otherBranch.getId() + "/import").with(as(manager))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rows\":[{\"name\":\"Beef\",\"unit\":\"kg\",\"quantity\":10}]}"))
-            .andExpect(status().isForbidden());
-
-        // ADMIN retains the existing all-branch stock access.
-        mockMvc.perform(get("/inventory/branch/" + otherBranch.getId()).with(as(owner)))
-            .andExpect(status().isOk());
     }
 
     @Test
@@ -283,6 +257,38 @@ class SecurityRulesTest extends IntegrationTestSupport {
             .andExpect(status().isOk());
         mockMvc.perform(get("/kitchen/branches/" + otherBranch.getId() + "/queue").with(as(owner)))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void permissionMatrixForWriteEndpoints() throws Exception {
+        MenuItemEntity dish = createMenuItem("Perm " + unique(), 40000);
+        overrideAtBranch(branch, dish, null, true);
+
+        // Kitchen ops: MANAGER allowed (→ 404 item not found), STAFF blocked (→ 403)
+        mockMvc.perform(put("/kitchen/items/999999/start").with(as(manager)))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(put("/kitchen/items/999999/start").with(as(waiter)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(put("/kitchen/items/999999/start").with(as(chef)))
+            .andExpect(status().isNotFound());
+
+        // Mark sold out: STAFF blocked (403), CHEF and MANAGER allowed (200)
+        mockMvc.perform(put("/branches/" + branch.getId() + "/menu/" + dish.getId() + "/availability")
+                .with(as(waiter)).contentType(MediaType.APPLICATION_JSON).content("{\"available\":true}"))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(put("/branches/" + branch.getId() + "/menu/" + dish.getId() + "/availability")
+                .with(as(chef)).contentType(MediaType.APPLICATION_JSON).content("{\"available\":true}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/branches/" + branch.getId() + "/menu/" + dish.getId() + "/availability")
+                .with(as(manager)).contentType(MediaType.APPLICATION_JSON).content("{\"available\":true}"))
+            .andExpect(status().isOk());
+
+        // Cross-branch: MANAGER of branch cannot mark availability on another branch
+        BranchEntity other = createBranch(null);
+        overrideAtBranch(other, dish, null, true);
+        mockMvc.perform(put("/branches/" + other.getId() + "/menu/" + dish.getId() + "/availability")
+                .with(as(manager)).contentType(MediaType.APPLICATION_JSON).content("{\"available\":false}"))
+            .andExpect(status().isForbidden());
     }
 
     @Test

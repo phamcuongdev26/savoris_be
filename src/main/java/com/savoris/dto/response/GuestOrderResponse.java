@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * The table's bill as the guest sees it: dishes and their kitchen progress, no staff or customer data.
  */
-public record GuestOrderResponse(String code, OrderStatus status, BigDecimal subtotal, BigDecimal discountAmount,
+public record GuestOrderResponse(String code, OrderStatus status, BigDecimal subtotal,
                                  BigDecimal vatAmount, BigDecimal totalAmount, List<Item> items) {
 
     @Schema(name = "GuestOrderItem")
@@ -21,7 +21,7 @@ public record GuestOrderResponse(String code, OrderStatus status, BigDecimal sub
 
     // images: dish photo by menu item id
     public static GuestOrderResponse from(OrderResponse order, Map<Integer, String> images) {
-        return new GuestOrderResponse(order.getCode(), order.getStatus(), order.getSubtotal(), order.getDiscountAmount(),
+        return new GuestOrderResponse(order.getCode(), order.getStatus(), order.getSubtotal(),
             order.getVatAmount(), order.getTotalAmount(),
             order.getItems().stream()
                 .map(i -> new Item(i.getItemName(), i.getQuantity(), i.getAmount(), i.getStatus(), i.getNotes(),

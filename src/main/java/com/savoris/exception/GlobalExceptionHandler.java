@@ -2,6 +2,7 @@ package com.savoris.exception;
 
 import com.savoris.dto.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -89,7 +90,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException ex) {
-        return error(ErrorCode.NOT_FOUND, "No endpoint " + ex.getResourcePath());
+        return error(ErrorCode.NOT_FOUND, "Không tìm thấy đường dẫn: " + ex.getResourcePath());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -102,19 +103,26 @@ public class GlobalExceptionHandler {
         MissingServletRequestParameterException.class})
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex) {
         log.warn("Bad request: {}", ex.getMessage());
-        return error(ErrorCode.INVALID_REQUEST, "Malformed request: check the JSON body and parameters");
+        return error(ErrorCode.INVALID_REQUEST, "Yêu cầu không hợp lệ: kiểm tra lại nội dung JSON và tham số");
     }
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleTooLarge(Exception ex) {
-        return error(ErrorCode.INVALID_REQUEST, "Image must be at most 2 MB");
+        return error(ErrorCode.INVALID_REQUEST, "Ảnh phải nhỏ hơn 2 MB");
     }
 
-    // Last line of defence for unique constraints hit by two requests at the same time
+    // Unique-constraint violations (e.g. duplicate weekday in opening_hour, duplicate username)
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
-        return error(ErrorCode.CONFLICT, "The data conflicts with existing records");
+        return error(ErrorCode.CONFLICT, "Dữ liệu vi phạm ràng buộc toàn vẹn, vui lòng kiểm tra lại");
+    }
+
+    // Unexpected database errors other than integrity violations
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ErrorResponse> handleDataAccess(DataAccessException ex) {
+        log.error("Database error", ex);
+        return error(ErrorCode.INTERNAL_SERVER_ERROR, "Lỗi cơ sở dữ liệu, vui lòng thử lại");
     }
 
     private static ResponseEntity<ErrorResponse> error(ErrorCode code, String message) {

@@ -14,7 +14,6 @@ import com.savoris.repository.BranchRepository;
 import com.savoris.repository.MenuItemRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.service.BranchMenuService;
-import com.savoris.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Set;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,7 +40,6 @@ public class BranchMenuServiceImpl implements BranchMenuService {
     private final BranchMenuItemRepository branchMenuItemRepository;
     private final BranchRepository branchRepository;
     private final BranchAccessGuard branchAccessGuard;
-    private final InventoryService inventoryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,11 +57,8 @@ public class BranchMenuServiceImpl implements BranchMenuService {
         List<MenuItemEntity> dishes = menuItemRepository.findByIsActiveTrueAndDeletedAtIsNullOrderByCategoryIdAscNameAsc().stream()
             .filter(item -> overrides.get(item.getId()) == null || Boolean.TRUE.equals(overrides.get(item.getId()).getOffered()))
             .toList();
-        // Ready-made dishes run out with their stock, not by the chef's say-so
-        Set<Integer> outOfStock = inventoryService.outOfStock(branchId, dishes.stream()
-            .filter(item -> Boolean.FALSE.equals(item.getNeedsKitchen())).map(MenuItemEntity::getId).toList());
         return dishes.stream()
-            .map(item -> withStock(toResponse(item, overrides.get(item.getId())), outOfStock.contains(item.getId())))
+            .map(item -> toResponse(item, overrides.get(item.getId())))
             .toList();
     }
 
@@ -155,14 +150,6 @@ public class BranchMenuServiceImpl implements BranchMenuService {
             created.setIsAvailable(true);
             return created;
         });
-    }
-
-    private static BranchMenuItemResponse withStock(BranchMenuItemResponse response, boolean outOfStock) {
-        response.setOutOfStock(outOfStock);
-        if (outOfStock) {
-            response.setAvailable(false);
-        }
-        return response;
     }
 
     private static BranchMenuItemResponse toResponse(MenuItemEntity item, BranchMenuItemEntity override) {

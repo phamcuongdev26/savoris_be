@@ -27,8 +27,6 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
         + "and o.publicToken is not null and o.transferClaimedAt is null and o.openedAt < :cutoff")
     List<OrderEntity> findExpiredWebTakeaways(@Param("cutoff") LocalDateTime cutoff);
     List<OrderEntity> findByBranchIdAndOpenedAtBetween(Integer branchId, LocalDateTime start, LocalDateTime end);
-    List<OrderEntity> findByCustomerId(Integer customerId);
-    List<OrderEntity> findByCustomerIdAndBranchId(Integer customerId, Integer branchId);
     boolean existsByTableIdAndStatus(Integer tableId, OrderStatus status);
     boolean existsByTableId(Integer tableId);
     Optional<OrderEntity> findFirstByTableIdAndStatusOrderByIdDesc(Integer tableId, OrderStatus status);
