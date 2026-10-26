@@ -43,12 +43,17 @@ public class WebsiteCmsController {
 
     @GetMapping("/public/branches/{slug}")
     public Map<String, Object> publicBranch(@PathVariable String slug) {
+        String canonicalSlug = switch (slug.toLowerCase(Locale.ROOT)) {
+            case "tay-ho" -> "hang-giay";
+            case "long-bien" -> "hang-ma";
+            default -> slug.toLowerCase(Locale.ROOT);
+        };
         Map<String, Object> branch = jdbc.query("select id, code, name, slug, address, city, phone, email, latitude, longitude from branches where slug=? and status='ACTIVE'", rs -> {
             if (!rs.next()) return null;
             Map<String, Object> row = new LinkedHashMap<>();
             for (String key : List.of("id", "code", "name", "slug", "address", "city", "phone", "email", "latitude", "longitude")) row.put(key, rs.getObject(key));
             return row;
-        }, slug);
+        }, canonicalSlug);
         if (branch == null) throw new AppException(ErrorCode.BRANCH_NOT_FOUND, "Không tìm thấy chi nhánh");
         Integer id = ((Number) branch.get("id")).intValue();
         Map<String, Object> page = jdbc.query("select payload::text from branch_page where branch_id=?", rs -> rs.next() ? jsonMap(rs.getString(1)) : Map.of(), id);

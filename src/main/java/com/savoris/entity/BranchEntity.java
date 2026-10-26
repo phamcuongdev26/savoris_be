@@ -26,6 +26,9 @@ public class BranchEntity {
     @Column(nullable = false)
     private String name;
 
+    @Column(length = 80)
+    private String slug;
+
     @Column(nullable = false)
     private String address;
 

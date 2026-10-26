@@ -40,7 +40,8 @@ public class BootstrapDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         for (int i = 1; i <= BRANCHES; i++) {
             String code = "CN%02d".formatted(i);
-            String district = switch (i) { case 1 -> "Hoàn Kiếm"; case 2 -> "Cầu Giấy"; case 3 -> "Tây Hồ"; default -> "Long Biên"; };
+            String district = switch (i) { case 1 -> "Hoàn Kiếm"; case 2 -> "Cầu Giấy"; case 3 -> "Hàng Giấy"; default -> "Hàng Mã"; };
+            String slug = switch (i) { case 1 -> "hoan-kiem"; case 2 -> "cau-giay"; case 3 -> "hang-giay"; default -> "hang-ma"; };
             BranchEntity branch = branchRepository.findByCode(code).orElseGet(() -> {
                 BranchEntity created = new BranchEntity();
                 created.setCode(code);
@@ -50,11 +51,23 @@ public class BootstrapDataSeeder implements ApplicationRunner {
                 return created;
             });
             branch.setName(district);
+            branch.setSlug(slug);
             if (branch.getAddress() == null || branch.getAddress().trim().length() < 10) {
-                branch.setAddress("DỮ LIỆU DEMO · Số 00, Phố Mẫu CN%02d, %s".formatted(i, district));
+                branch.setAddress(switch (i) {
+                    case 3 -> "Số 40, Phố Hàng Giấy, Hà Nội";
+                    case 4 -> "Số 43, Phố Hàng Mã, Hà Nội";
+                    default -> "DỮ LIỆU DEMO · Số 00, Phố Mẫu CN%02d, %s".formatted(i, district);
+                });
             }
             if (branch.getCity() == null || branch.getCity().equals("Chưa cập nhật")) branch.setCity("Hà Nội");
-            if (branch.getPhone() == null || branch.getPhone().isBlank()) branch.setPhone("000000000%d".formatted(i));
+            if (branch.getPhone() == null || branch.getPhone().isBlank()) {
+                branch.setPhone(switch (i) {
+                    case 1 -> "02473028181";
+                    case 2 -> "02473028182";
+                    case 3 -> "04727352235";
+                    default -> "0384975244";
+                });
+            }
             if (branch.getEmail() == null || branch.getEmail().isBlank()) branch.setEmail("cn%02d@savoris.invalid".formatted(i));
             branch = branchRepository.save(branch);
         }

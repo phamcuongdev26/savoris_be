@@ -49,7 +49,10 @@ public class AiChatService {
     private final ObjectMapper mapper;
 
     public AiChatResponse chat(AiChatRequest request) {
-        if (!Boolean.TRUE.equals(request.agentMode())) {
+        if (Boolean.TRUE.equals(request.agentMode())) {
+            var liveFact = faqService.answerFromLiveData(request.message());
+            if (liveFact.isPresent()) return new AiChatResponse(liveFact.get());
+        } else {
             var faq = faqService.answer(request.message());
             if (faq.isPresent()) return new AiChatResponse(faq.get());
         }

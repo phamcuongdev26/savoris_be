@@ -93,7 +93,7 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
         return branches.stream()
             .map(b -> {
                 boolean openNow = isOpenNow(b.getId());
-                return new PublicBranchResponse(b.getId(), b.getCode(), b.getName(), b.getAddress(),
+                return new PublicBranchResponse(b.getId(), b.getCode(), b.getName(), b.getSlug(), b.getAddress(),
                     openNow && loads.get(b.getId()).isAcceptingTakeaway(), loads.get(b.getId()).getEstimatedWaitMinutes(),
                     settingService.transferAvailable(b.getId()), b.getCity(), b.getLatitude(), b.getLongitude(), openNow,
                     b.getPhone(), b.getEmail(), jdbc.query(
@@ -152,6 +152,15 @@ public class GuestTakeawayServiceImpl implements GuestTakeawayService {
         BranchLoadResponse load = kitchenService.computeLoad(branch);
         if (!load.isAcceptingTakeaway()) {
             return new TakeawayEstimateResponse(0, null, null, false, "Bếp đang tạm ngưng nhận đơn mang về.");
+        }
+
+        java.util.Set<Integer> branchTakeawayMenuIds = branchMenuService.getPublicMenu(branchId).stream()
+            .filter(BranchMenuItemResponse::isAvailable)
+            .filter(BranchMenuItemResponse::isTakeawayAvailable)
+            .map(BranchMenuItemResponse::getMenuItemId)
+            .collect(Collectors.toSet());
+        if (items.stream().anyMatch(item -> !branchTakeawayMenuIds.contains(item.getMenuItemId()))) {
+            throw new AppException(ErrorCode.MENU_ITEM_UNAVAILABLE, "Món không bán hoặc hiện không có tại chi nhánh này.");
         }
 
         Map<Integer, MenuItemEntity> menuItems = menuItemRepository.findAllById(

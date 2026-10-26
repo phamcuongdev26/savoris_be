@@ -30,7 +30,7 @@ class AiChatServiceTest {
         GuestTakeawayService guestService = mock(GuestTakeawayService.class);
         ReservationService reservationService = mock(ReservationService.class);
         when(ai.isConfigured()).thenReturn(false);
-        when(guestService.getBranches()).thenReturn(List.of(new PublicBranchResponse(1, "CN01", "Hoàn Kiếm",
+        when(guestService.getBranches()).thenReturn(List.of(new PublicBranchResponse(1, "CN01", "Hoàn Kiếm", "hoan-kiem",
             "12 Lý Quốc Sư", true, 5, true, "Hà Nội", null, null, true,
             "024 7302 8181", "hoankiem@savoris.vn", List.of())));
 
@@ -69,18 +69,35 @@ class AiChatServiceTest {
     }
 
     @Test
-    void agentModeRoutesEvenFaqLikeQuestionsThroughTheAiAgent() {
+    void agentModeUsesLiveBranchDataWithoutCallingTheModel() {
+        AiModelClient ai = mock(AiModelClient.class);
+        GuestTakeawayService guestService = mock(GuestTakeawayService.class);
+        ReservationService reservationService = mock(ReservationService.class);
+        when(guestService.getBranches()).thenReturn(List.of(new PublicBranchResponse(2, "CN02", "Cầu Giấy", "cau-giay",
+            "24 Trần Thái Tông", true, 5, true, "Hà Nội", null, null, true,
+            "024 7302 8182", "caugiay@savoris.vn", List.of())));
+
+        AiChatService service = new AiChatService(ai, new AiFaqService(guestService, reservationService), guestService, reservationService, new ObjectMapper());
+        AiChatResponse response = service.chat(new AiChatRequest("Chi nhánh Cầu Giấy ở đâu và mở cửa lúc nào?", List.of(), true));
+
+        assertThat(response.reply()).contains("24 Trần Thái Tông", "đang mở");
+        verify(ai, never()).complete(anyList(), anyList(), anyBoolean());
+        verify(guestService).getBranches();
+    }
+
+    @Test
+    void agentModeStillUsesTheModelForQuestionsOutsideLiveFactRoutes() {
         AiModelClient ai = mock(AiModelClient.class);
         GuestTakeawayService guestService = mock(GuestTakeawayService.class);
         ReservationService reservationService = mock(ReservationService.class);
         when(ai.isConfigured()).thenReturn(true);
         when(ai.complete(anyList(), anyList(), anyBoolean()))
-            .thenReturn(new AiModelClient.AiCompletion("Mình sẽ giúp bạn tìm thông tin phù hợp.", List.of()));
+            .thenReturn(new AiModelClient.AiCompletion("Mình sẽ giúp bạn chọn món phù hợp.", List.of()));
 
         AiChatService service = new AiChatService(ai, new AiFaqService(guestService, reservationService), guestService, reservationService, new ObjectMapper());
-        AiChatResponse response = service.chat(new AiChatRequest("Thông tin chi nhánh và giờ mở cửa", List.of(), true));
+        AiChatResponse response = service.chat(new AiChatRequest("Gợi ý một bữa tối nhẹ nhàng cho gia đình.", List.of(), true));
 
-        assertThat(response.reply()).contains("giúp bạn");
+        assertThat(response.reply()).contains("chọn món");
         verify(ai).complete(anyList(), anyList(), anyBoolean());
         verify(guestService, never()).getBranches();
     }

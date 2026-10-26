@@ -41,6 +41,14 @@ public class AiFaqService {
         return Optional.empty();
     }
 
+    /** Live branch/menu facts bypass the model even in free-form agent mode. */
+    public Optional<String> answerFromLiveData(String message) {
+        String query = normalize(message);
+        if (MENU_TERMS.stream().anyMatch(query::contains)) return Optional.of(menuAnswer(query));
+        if (BRANCH_TERMS.stream().anyMatch(query::contains)) return Optional.of(branchAnswer(query));
+        return Optional.empty();
+    }
+
     private String slotAnswer(String query) {
         Optional<LocalDate> date = DATE.matcher(query).results().findFirst().map(match -> match.group(1) != null
             ? LocalDate.of(Integer.parseInt(match.group(1)), Integer.parseInt(match.group(2)), Integer.parseInt(match.group(3)))

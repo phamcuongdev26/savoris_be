@@ -64,7 +64,25 @@ class WebTakeawayTest extends IntegrationTestSupport {
 
         mockMvc.perform(post("/public/takeaway-orders/estimate").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branch.getId() + ",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":1}]}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void estimatesDishPreparationFromCookingTimeWithoutCountingQueueTwice() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            String placed = order("CASH").andReturn().getResponse().getContentAsString();
+            String token = JsonPath.read(placed, "$.token");
+            int orderId = jdbcTemplate.queryForObject("select id from orders where public_token = ?", Integer.class, token);
+            pay(cashier, orderId, 100000).andExpect(status().isCreated());
+            jdbcTemplate.update("update order_items set status='READY', ordered_at=now() - interval '2 hours', "
+                + "cooking_started_at=now() - interval '30 minutes', ready_at=now(), updated_at=now() where order_id=?", orderId);
+        }
+
+        mockMvc.perform(post("/public/takeaway-orders/estimate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"branchId\":" + branch.getId() + ",\"items\":[{\"menuItemId\":" + pho.getId() + ",\"quantity\":2}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estimatedMinutes").value(org.hamcrest.Matchers.allOf(
+                org.hamcrest.Matchers.greaterThanOrEqualTo(35), org.hamcrest.Matchers.lessThanOrEqualTo(60))));
     }
 
     @Test

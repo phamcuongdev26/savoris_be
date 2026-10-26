@@ -76,7 +76,7 @@ class AiFaqServiceTest {
     }
 
     private static PublicBranchResponse branch() {
-        return new PublicBranchResponse(1, "CN01", "Hoàn Kiếm", "12 Lý Quốc Sư", true, 5, true,
+        return new PublicBranchResponse(1, "CN01", "Hoàn Kiếm", "hoan-kiem", "12 Lý Quốc Sư", true, 5, true,
             "Hà Nội", 21.0, 105.0, true, "024 7302 8181", "hoankiem@savoris.vn",
             List.of(new PublicBranchResponse.Hours("Thứ Hai", "10:00 – 22:00")));
     }
