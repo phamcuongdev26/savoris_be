@@ -84,6 +84,13 @@ savoris:
     # Max dish portions waiting/cooking per branch before takeaway & delivery are paused.
     # Override per branch with branches.kitchen_capacity (PUT /branches/{id}).
     default-capacity: 40
+  ai:
+    # Optional OpenAI-compatible chat completions provider. Empty credentials keep the app running with AI endpoints disabled.
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    timeout: ${AI_TIMEOUT:20s}
+    max-requests-per-minute: ${AI_MAX_REQUESTS_PER_MINUTE:30}
 
 logging:
   level:

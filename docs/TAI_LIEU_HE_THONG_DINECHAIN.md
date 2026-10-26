@@ -447,6 +447,14 @@ Trả về JSON:
 
 ---
 
+### 8.3 API và cấu hình backend
+
+- `POST /public/ai/chat` (không cần đăng nhập): body `{ "message": "...", "history": [{"role":"user|assistant","content":"..."}] }`; trả `{ "reply": "..." }`. Tin nhắn tối đa 1.500 ký tự, lịch sử tối đa 10 lượt. Backend chỉ cho tạo tối đa một đặt bàn trong một request và chỉ khi tin nhắn mới nhất yêu cầu đặt bàn rõ ràng.
+- `GET /dashboard/branch/{branchId}/kitchen-forecast` (ADMIN hoặc MANAGER đúng chi nhánh): trả tải hiện tại, lịch sử giờ cùng thứ trong 28 ngày trước, dự báo hai giờ kế tiếp, cảnh báo và khuyến nghị. `activeChefAccounts` là số tài khoản CHEF trạng thái ACTIVE, không phải dữ liệu chấm công/ca trực.
+- Cấu hình provider tương thích OpenAI Chat Completions bằng biến môi trường `AI_BASE_URL` (mặc định `https://api.openai.com/v1`), `AI_API_KEY`, `AI_MODEL` và tùy chọn `AI_TIMEOUT` (mặc định `20s`). Không có API key/model thì ứng dụng vẫn khởi động nhưng hai API AI trả HTTP 503 `AI_NOT_CONFIGURED`; lỗi provider hoặc JSON không hợp lệ trả HTTP 502 `AI_PROVIDER_FAILED`.
+- Chat public được giới hạn toàn hệ thống ở 30 request/phút bằng bộ đếm PostgreSQL dùng chung giữa các instance; tùy chỉnh bằng `AI_MAX_REQUESTS_PER_MINUTE`. Khi vượt giới hạn trả HTTP 429 `AI_RATE_LIMITED`.
+- Nội dung chat và kết quả tool cần thiết sẽ được gửi tới provider AI đã cấu hình. Không gửi dữ liệu thanh toán; cân nhắc thông báo cho khách trước khi bật chatbot trên production.
+
 ## 9. Ghi chú quan trọng
 
 > **Phân quyền GitHub / Deploy:** Các role trong hệ thống (ADMIN, MANAGER, STAFF, CHEF) là phân quyền **nghiệp vụ trong app** — không liên quan đến quyền push code hay deploy. Việc push lên GitHub và deploy lên Render/Vercel chỉ dành cho **developer** có GitHub credentials, hoàn toàn tách biệt với tài khoản đăng nhập app.

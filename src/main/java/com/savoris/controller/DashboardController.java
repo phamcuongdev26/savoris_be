@@ -2,9 +2,11 @@ package com.savoris.controller;
 
 import com.savoris.dto.response.BranchDashboardResponse;
 import com.savoris.dto.response.ChainDashboardResponse;
+import com.savoris.dto.response.KitchenForecastResponse;
 import com.savoris.security.CurrentUser;
 import com.savoris.security.Roles;
 import com.savoris.service.DashboardService;
+import com.savoris.service.KitchenForecastService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final KitchenForecastService kitchenForecastService;
 
     @GetMapping("/chain")
     @PreAuthorize(Roles.ADMIN)
@@ -40,5 +43,14 @@ public class DashboardController {
             @PathVariable Integer branchId,
             @CurrentUser Integer staffId) {
         return ResponseEntity.ok(dashboardService.getBranchDashboard(staffId, branchId));
+    }
+
+    @GetMapping("/branch/{branchId}/kitchen-forecast")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Operation(summary = "Dự báo tải bếp 2 giờ tới", description = "Dùng tải bếp hiện tại và lịch sử bốn tuần cùng thứ; chỉ manager/admin của chi nhánh.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<KitchenForecastResponse> getKitchenForecast(
+            @PathVariable Integer branchId, @CurrentUser Integer staffId) {
+        return ResponseEntity.ok(kitchenForecastService.forecast(staffId, branchId));
     }
 }

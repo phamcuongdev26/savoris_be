@@ -42,6 +42,9 @@ public enum ErrorCode {
     BRANCH_BUSY("BRANCH_BUSY", "Bếp đang quá tải, tạm dừng nhận đơn mang về", 503),
     IMAGE_STORAGE_NOT_CONFIGURED("IMAGE_STORAGE_NOT_CONFIGURED", "Chưa cấu hình lưu trữ ảnh: cần đặt CLOUDINARY_URL trên máy chủ", 503),
     IMAGE_UPLOAD_FAILED("IMAGE_UPLOAD_FAILED", "Không thể lưu ảnh, vui lòng thử lại", 502),
+    AI_NOT_CONFIGURED("AI_NOT_CONFIGURED", "Tính năng AI chưa được cấu hình trên máy chủ", 503),
+    AI_RATE_LIMITED("AI_RATE_LIMITED", "Trợ lý đang nhận quá nhiều yêu cầu. Vui lòng thử lại sau một phút", 429),
+    AI_PROVIDER_FAILED("AI_PROVIDER_FAILED", "Dịch vụ AI hiện không khả dụng, vui lòng thử lại sau", 502),
 
     // Server errors
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "Lỗi máy chủ nội bộ", 500);
