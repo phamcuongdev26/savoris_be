@@ -110,7 +110,10 @@ public class AiFaqService {
     private String formatBranch(PublicBranchResponse branch) {
         StringBuilder answer = new StringBuilder("• ").append(branch.code()).append(" · ").append(branch.name());
         if (branch.address() != null && !branch.address().isBlank()) answer.append(" — ").append(branch.address());
-        if (branch.city() != null && !branch.city().isBlank()) answer.append(", ").append(branch.city());
+        if (branch.city() != null && !branch.city().isBlank()
+            && (branch.address() == null || !normalize(branch.address()).contains(normalize(branch.city())))) {
+            answer.append(", ").append(branch.city());
+        }
         if (branch.hours() != null && !branch.hours().isEmpty()) {
             answer.append(". Giờ mở cửa: ").append(branch.hours().stream().map(h -> h.days() + ": " + h.time())
                 .reduce((a, b) -> a + "; " + b).orElse("đang cập nhật"));

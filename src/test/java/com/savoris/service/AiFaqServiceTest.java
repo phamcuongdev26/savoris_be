@@ -28,6 +28,18 @@ class AiFaqServiceTest {
     }
 
     @Test
+    void doesNotRepeatCityWhenFullAddressAlreadyContainsIt() {
+        PublicBranchResponse branch = new PublicBranchResponse(3, "CN03", "Hàng Giấy", "hang-giay",
+            "Số 40, Phố Hàng Giấy, Hà Nội", true, 5, true, "Hà Nội", null, null, true,
+            "04727352235", "cn03@savoris.invalid", List.of());
+        when(guestService.getBranches()).thenReturn(List.of(branch));
+
+        String answer = faq.answer("Địa chỉ chi nhánh CN03").orElseThrow();
+
+        assertThat(answer.split("Hà Nội", -1)).hasSize(2);
+    }
+
+    @Test
     void answersMenuAndPriceFromSelectedBranchData() {
         BranchMenuItemResponse pho = new BranchMenuItemResponse(7, 1, "PHO", "Phở bò", "bát",
             new BigDecimal("85000"), null, new BigDecimal("85000"), true, null, true, false, true);
