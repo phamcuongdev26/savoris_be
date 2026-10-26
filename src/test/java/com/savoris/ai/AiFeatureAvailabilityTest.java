@@ -21,7 +21,7 @@ class AiFeatureAvailabilityTest {
 
     @Test
     void chatExplainsProviderMustBeConfigured() {
-        AiChatService service = new AiChatService(unconfigured, null, null, new ObjectMapper());
+        AiChatService service = new AiChatService(unconfigured, new com.savoris.service.AiFaqService(null, null), null, null, new ObjectMapper());
         assertThatThrownBy(() -> service.chat(new AiChatRequest("Xin chào", null)))
             .isInstanceOf(AppException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.AI_NOT_CONFIGURED);
