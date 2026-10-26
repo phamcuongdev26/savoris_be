@@ -118,6 +118,26 @@ class CashPaymentTest extends IntegrationTestSupport {
     }
 
     @Test
+    void refundCanOnlyBeAppliedOnceWhenTwoManagersActAtTheSameTime() throws Exception {
+        String paid = pay(cashier, orderId, 110000).andReturn().getResponse().getContentAsString();
+        int paymentId = JsonPath.read(paid, "$.id");
+        List<Callable<Integer>> attempts = List.of(
+            () -> mockMvc.perform(put("/payments/" + paymentId + "/refund").with(as(manager)))
+                .andReturn().getResponse().getStatus(),
+            () -> mockMvc.perform(put("/payments/" + paymentId + "/refund").with(as(manager)))
+                .andReturn().getResponse().getStatus());
+        ExecutorService pool = Executors.newFixedThreadPool(attempts.size());
+        try {
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : pool.invokeAll(attempts)) statuses.add(future.get());
+            assertThat(statuses).filteredOn(status -> status == 200).hasSize(1);
+            assertThat(statuses).filteredOn(status -> status == 409).hasSize(1);
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    @Test
     void cannotPayForAnotherBranchOrACancelledOrder() throws Exception {
         StaffEntity outsider = createStaff(StaffRole.STAFF, createBranch(null));
         pay(outsider, orderId, 110000).andExpect(status().isForbidden());

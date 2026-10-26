@@ -81,6 +81,24 @@ class SepayWebhookTest extends IntegrationTestSupport {
     }
 
     @Test
+    void aSePayTransactionIdCanSettleOnlyOneOrderEvenIfItIsRetriedWithDifferentContent() throws Exception {
+        String first = order().andReturn().getResponse().getContentAsString();
+        String firstCode = JsonPath.read(first, "$.code");
+        long amount = ((Number) JsonPath.read(first, "$.totalAmount")).longValue();
+        String second = order().andReturn().getResponse().getContentAsString();
+        String secondCode = JsonPath.read(second, "$.code");
+        String secondToken = JsonPath.read(second, "$.token");
+
+        webhook("test-sepay-key", 77, "in", amount, firstCode)
+            .andExpect(status().isOk()).andExpect(jsonPath("$.order").value(firstCode));
+        webhook("test-sepay-key", 77, "in", amount, firstCode + " " + secondCode)
+            .andExpect(status().isOk()).andExpect(jsonPath("$.order").doesNotExist());
+
+        mockMvc.perform(get("/public/takeaway-orders/" + secondToken))
+            .andExpect(jsonPath("$.paid").value(false));
+    }
+
+    @Test
     void onlyGenuineFullTransfersIntoTheChainAccountPayAnOrder() throws Exception {
         String placed = order().andReturn().getResponse().getContentAsString();
         String token = JsonPath.read(placed, "$.token");

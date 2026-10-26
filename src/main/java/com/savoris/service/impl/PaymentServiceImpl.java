@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,6 +45,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final TakeawayNotifier takeawayNotifier;
     private final KitchenQueueEvents kitchenQueueEvents;
     private final SettingService settingService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -93,7 +95,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public String confirmBankTransfer(String content, BigDecimal amount, String reference, String accountNumber, String subAccount) {
+    public String confirmBankTransfer(Long transactionId, String content, BigDecimal amount, String reference, String accountNumber, String subAccount) {
         for (String code : Sepay.orderCodesIn(content)) {
             Integer id = orderRepository.findByCode(code).map(OrderEntity::getId).orElse(null);
             if (id == null) {
@@ -108,6 +110,12 @@ public class PaymentServiceImpl implements PaymentService {
                 log.warn("Transfer {} referenced order {} but arrived on another branch account", reference, code);
                 continue;
             }
+            // Claim each provider event once, across all app instances. The claim commits atomically with payment.
+            // It is placed after matching the branch account, but before handling short/late/already-settled money.
+            if (transactionId != null && !claimSePayTransaction(transactionId, id, reference)) {
+                log.info("SePay transaction {} was already handled", transactionId);
+                return null;
+            }
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 // Money for an order that already expired or was cancelled: the counter has to pay it back
                 if (order.getRefundDueAt() == null) {
@@ -115,16 +123,16 @@ public class PaymentServiceImpl implements PaymentService {
                     orderRepository.save(order);
                 }
                 log.warn("Transfer {} of {} for cancelled order {}: refund due", reference, amount, code);
-                continue;
+                return null;
             }
             if (order.getStatus() != OrderStatus.AWAITING_PAYMENT || paymentRepository.findByOrderId(id).isPresent()) {
                 // Already paid (the cashier confirmed this same money by hand, or SePay retried)
                 log.info("Transfer {} of {} for order {} which is {}: already settled", reference, amount, code, order.getStatus());
-                continue;
+                return null;
             }
             if (amount == null || amount.compareTo(order.getTotalAmount()) < 0) {
                 log.warn("Transfer {} of {} for order {} is short of {}: left for the cashier", reference, amount, code, order.getTotalAmount());
-                continue;
+                return null;
             }
             PaymentEntity payment = new PaymentEntity();
             payment.setOrderId(id);
@@ -170,9 +178,13 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponse refundPayment(Integer staffId, Integer paymentId) {
-        PaymentEntity payment = findPayment(paymentId);
-        OrderEntity order = orderRepository.findByIdForUpdate(payment.getOrderId())
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Order not found: " + payment.getOrderId()));
+        Integer orderId = paymentRepository.findOrderIdById(paymentId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Payment not found: " + paymentId));
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
+        // Lock payment after order (the same lock ordering as all payment mutations) and read fresh state.
+        PaymentEntity payment = paymentRepository.findByIdForUpdate(paymentId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Payment not found: " + paymentId));
         branchAccessGuard.check(staffId, order.getBranchId());
 
         if (payment.getStatus() != PaymentStatus.PAID) {
@@ -190,6 +202,14 @@ public class PaymentServiceImpl implements PaymentService {
     private PaymentEntity findPayment(Integer paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Payment not found: " + paymentId));
+    }
+
+    private boolean claimSePayTransaction(Long transactionId, Integer orderId, String reference) {
+        return jdbcTemplate.update("""
+            insert into sepay_transactions (transaction_id, order_id, reference_code, processed_at)
+            values (?, ?, ?, now())
+            on conflict (transaction_id) do nothing
+            """, transactionId, orderId, reference) == 1;
     }
 
     private void checkAccess(Integer staffId, Integer orderId) {

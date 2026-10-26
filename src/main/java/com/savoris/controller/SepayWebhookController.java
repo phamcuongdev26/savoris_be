@@ -51,7 +51,7 @@ public class SepayWebhookController {
         String order = null;
         if ("in".equalsIgnoreCase(tx.transferType())) {
             String reference = ("SEPAY-" + tx.id() + (tx.referenceCode() != null ? " " + tx.referenceCode() : ""));
-            order = paymentService.confirmBankTransfer(tx.content(), tx.transferAmount(),
+            order = paymentService.confirmBankTransfer(tx.id(), tx.content(), tx.transferAmount(),
                 reference.length() > 100 ? reference.substring(0, 100) : reference, tx.accountNumber(), tx.subAccount());
         }
         // Always answer success once the call is genuine: SePay retries otherwise, and a retry would not match either

@@ -3,6 +3,8 @@ package com.savoris.repository;
 import com.savoris.constant.PaymentStatus;
 import com.savoris.entity.PaymentEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,13 @@ import java.util.Optional;
 @Repository
 public interface PaymentRepository extends JpaRepository<PaymentEntity, Integer> {
     Optional<PaymentEntity> findByOrderId(Integer orderId);
+
+    @Query("select p.orderId from PaymentEntity p where p.id = :id")
+    Optional<Integer> findOrderIdById(@Param("id") Integer id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from PaymentEntity p where p.id = :id")
+    Optional<PaymentEntity> findByIdForUpdate(@Param("id") Integer id);
     List<PaymentEntity> findByStatus(PaymentStatus status);
     boolean existsByOrderIdAndStatus(Integer orderId, PaymentStatus status);
 

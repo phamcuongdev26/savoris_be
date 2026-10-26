@@ -368,7 +368,89 @@ Takeaway paused → acceptingTakeaway = false (bất kể tải)
 
 ---
 
-## 7. Ghi chú quan trọng
+## 8. Tích hợp AI — Prompt mẫu
+
+### 8.1 Chatbot khách hàng (trang public)
+
+```
+System:
+Bạn là trợ lý ảo của nhà hàng Savoris — chuỗi nhà hàng Việt Nam
+với 4 chi nhánh tại Hà Nội.
+
+Bạn có thể giúp khách:
+- Xem thực đơn và giá món
+- Kiểm tra chi nhánh còn nhận đơn mang về không
+- Đặt bàn
+- Hỏi giờ mở cửa, địa chỉ
+
+Khi cần thực hiện hành động (đặt bàn, kiểm tra menu...),
+gọi đúng tool được cung cấp, KHÔNG tự bịa dữ liệu.
+Trả lời ngắn gọn, thân thiện, bằng tiếng Việt.
+Nếu không chắc thông tin, hỏi lại khách thay vì đoán.
+
+Tools có sẵn:
+- get_branches()              → danh sách chi nhánh + trạng thái
+- get_menu(branchId)          → thực đơn chi nhánh
+- get_slots(branchId, date)   → khung giờ đặt bàn còn trống
+- create_reservation(branchId, name, phone, date, guests) → đặt bàn
+```
+
+---
+
+### 8.2 AI dự báo tải bếp giờ vàng (dashboard manager)
+
+```
+System:
+Bạn là chuyên gia phân tích vận hành bếp nhà hàng.
+Phân tích dữ liệu được cung cấp và đưa ra khuyến nghị
+ngắn gọn, thực tế bằng tiếng Việt.
+Chỉ trả về JSON đúng format yêu cầu, không giải thích thêm.
+
+User:
+Chi nhánh: {{branch_name}}
+Thời điểm hiện tại: {{datetime}}
+Sức chứa bếp: {{capacity}} món/giờ
+Số đầu bếp đang làm: {{active_chefs}}
+
+Trạng thái bếp hiện tại:
+- Đang chờ nấu: {{pending}} món
+- Đang nấu: {{cooking}} món
+- Tải hiện tại: {{load_percent}}%
+
+Lịch sử {{weekday}} 4 tuần gần nhất (theo giờ):
+| Giờ | TB đơn | TB món | Tải TB% |
+|-----|--------|--------|---------|
+| 17h |   8    |   24   |   60%   |
+| 18h |  15    |   48   |   95%   |
+| 19h |  22    |   71   |  142%   |
+| 20h |  18    |   55   |  110%   |
+
+Hãy:
+1. Dự báo tải bếp 2 giờ tới theo từng giờ
+2. Xác định nguy cơ OVERLOADED
+3. Đưa ra 1–2 hành động cụ thể cho manager
+
+Trả về JSON:
+{
+  "forecast": [
+    { "hour": "19h", "predictedLoad": 95, "risk": "HIGH" },
+    { "hour": "20h", "predictedLoad": 110, "risk": "OVERLOADED" }
+  ],
+  "alert": "Bếp có nguy cơ quá tải lúc 20h",
+  "actions": [
+    "Tạm ngưng nhận đơn mang về từ 19:30",
+    "Gọi thêm 1 đầu bếp ca tối"
+  ],
+  "suggestedPauseAt": "19:30"
+}
+```
+
+---
+
+## 9. Ghi chú quan trọng
+
+> **Phân quyền GitHub / Deploy:** Các role trong hệ thống (ADMIN, MANAGER, STAFF, CHEF) là phân quyền **nghiệp vụ trong app** — không liên quan đến quyền push code hay deploy. Việc push lên GitHub và deploy lên Render/Vercel chỉ dành cho **developer** có GitHub credentials, hoàn toàn tách biệt với tài khoản đăng nhập app.
+
 
 1. **KHÔNG push trực tiếp lên master** khi chưa test và backup DB — Render auto-deploy + Flyway chạy migration ngay lập tức, không rollback được.
 2. **Mật khẩu production** (`savoris123`) chỉ trong biến môi trường `BOOTSTRAP_PASSWORD` trên Render, không commit vào code.
