@@ -11,9 +11,13 @@ import com.savoris.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.task.SyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -39,12 +43,20 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(TestDatabaseConfig.class)
+@Import({TestDatabaseConfig.class, AuthBranchHttpTest.SynchronousAsyncExecutorConfig.class})
 class AuthBranchHttpTest {
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
     private static final AtomicInteger IDS = new AtomicInteger();
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class SynchronousAsyncExecutorConfig {
+        @Bean(name = "taskExecutor")
+        TaskExecutor taskExecutor() {
+            return new SyncTaskExecutor();
+        }
+    }
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) throws Exception {
