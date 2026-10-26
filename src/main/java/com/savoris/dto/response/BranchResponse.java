@@ -49,4 +49,14 @@ public class BranchResponse {
         response.setUpdatedAt(entity.getUpdatedAt());
         return response;
     }
+
+    public static BranchResponse operationalContext(BranchResponse branch) {
+        BranchResponse response = new BranchResponse();
+        response.setId(branch.getId());
+        response.setCode(branch.getCode());
+        response.setName(branch.getName());
+        response.setTakeawayPaused(branch.getTakeawayPaused());
+        response.setStatus(branch.getStatus());
+        return response;
+    }
 }

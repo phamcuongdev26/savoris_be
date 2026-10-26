@@ -40,7 +40,7 @@ public class OrderController {
     @GetMapping("/{orderId}")
     @Operation(summary = "Lấy đơn hàng")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.RESTAURANT)
+    @PreAuthorize(Roles.ORDER_WRITE)
     public ResponseEntity<OrderResponse> getOrder(@CurrentUser Integer staffId, @PathVariable Integer orderId) {
         return ResponseEntity.ok(orderService.getOrder(staffId, orderId));
     }
@@ -64,7 +64,7 @@ public class OrderController {
     @GetMapping("/branch/{branchId}")
     @Operation(summary = "Danh sách đơn hàng đang mở theo chi nhánh")
     @SecurityRequirement(name = "bearerAuth")
-    @PreAuthorize(Roles.RESTAURANT)
+    @PreAuthorize(Roles.ORDER_WRITE)
     public ResponseEntity<List<OrderResponse>> getOrdersByBranch(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
         return ResponseEntity.ok(orderService.getOrdersByBranch(staffId, branchId));
     }

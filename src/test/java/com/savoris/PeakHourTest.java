@@ -43,7 +43,7 @@ class PeakHourTest extends IntegrationTestSupport {
             .andExpect(status().isCreated())
             .andReturn().getResponse().getContentAsString();
 
-        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/load").with(as(cashier)))
+        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/load").with(as(chef)))
             .andExpect(jsonPath("$.pendingPortions").value(5))
             .andExpect(jsonPath("$.loadPercent").value(100))
             .andExpect(jsonPath("$.status").value("OVERLOADED"))
@@ -72,7 +72,7 @@ class PeakHourTest extends IntegrationTestSupport {
         }
 
         // Speed = 5 portions per 5 minutes (shortest sample) -> 1 portion waiting = 1 minute
-        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/load").with(as(cashier)))
+        mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/load").with(as(chef)))
             .andExpect(jsonPath("$.pendingPortions").value(1))
             .andExpect(jsonPath("$.loadPercent").value(20))
             .andExpect(jsonPath("$.status").value("NORMAL"))

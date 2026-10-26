@@ -44,6 +44,8 @@ DineChain là nền tảng quản lý chuỗi nhà hàng nhiều chi nhánh. M�
 - **STAFF** – nhân viên phục vụ / thu ngân: tạo order, phục vụ, thanh toán, đặt bàn. Không vào bếp, không sửa menu.
 - **CHEF** – đầu bếp: chỉ thao tác màn hình bếp (xem queue, chuyển trạng thái món, đánh dấu hết hàng). Không tạo order, không thu tiền.
 
+STAFF và CHEF chỉ nhận thông tin nhận diện chi nhánh cần cho POS/KDS (`id`, `code`, `name`, `status`, `takeawayPaused`). Xem thông tin cấu hình chi nhánh và tìm kiếm chi nhánh yêu cầu ADMIN/MANAGER.
+
 Ngoài role, hệ thống còn enforce **branch scope** ở tầng service qua `BranchAccessGuard`: MANAGER/STAFF/CHEF chỉ thao tác được với chi nhánh của mình.
 
 ### 2.2 Ma trận phân quyền chi tiết
@@ -85,8 +87,8 @@ Ngoài role, hệ thống còn enforce **branch scope** ở tầng service qua `
 | Hoàn tất order (gọi đủ món) | ✅ | ✅ | ✅ | ❌ |
 | Khách tự quét QR gọi món | Không cần đăng nhập | | | |
 | **BẾP** |||||
-| Xem queue bếp | ✅ | ✅ | ❌ | ✅ |
-| Bắt đầu nấu / xong / phục vụ | ✅ | ✅ | ❌ | ✅ |
+| Xem queue / bắt đầu nấu / đánh dấu xong | ✅ | ✅ | ❌ | ✅ |
+| Ghi nhận món đã mang ra (STAFF từ POS, CHEF từ KDS) | ✅ | ✅ | ✅ | ✅ |
 | Duyệt / từ chối hủy món | ✅ | ✅ | ❌ | ✅ |
 | Xem tải bếp (load / wait estimate) | ✅ | ✅ | ❌ | ✅ |
 | **THANH TOÁN** |||||

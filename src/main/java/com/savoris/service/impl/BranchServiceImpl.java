@@ -118,7 +118,9 @@ public class BranchServiceImpl implements BranchService {
     public List<BranchResponse> getBranchesFor(Integer staffId) {
         var user = branchAccessGuard.currentUser(staffId);
         if (user.getRole() == com.savoris.constant.StaffRole.ADMIN) return getAllBranches();
-        return List.of(getBranch(user.getBranchId()));
+        BranchResponse branch = getBranch(user.getBranchId());
+        if (user.getRole() == com.savoris.constant.StaffRole.MANAGER) return List.of(branch);
+        return List.of(BranchResponse.operationalContext(branch));
     }
 
     @Override

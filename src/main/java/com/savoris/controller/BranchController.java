@@ -56,6 +56,7 @@ public class BranchController {
         description = "Lấy chi tiết thông tin của một chi nhánh"
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.MANAGEMENT)
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Thông tin chi nhánh"),
         @ApiResponse(responseCode = "404", description = "Không tìm thấy chi nhánh",
@@ -150,6 +151,7 @@ public class BranchController {
         description = "Tìm kiếm chi nhánh theo tên"
     )
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.MANAGEMENT)
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh tìm kiếm được"),
         @ApiResponse(responseCode = "401", description = "Chưa xác thực",

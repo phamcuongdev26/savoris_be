@@ -82,7 +82,7 @@ class KitchenFlowTest extends IntegrationTestSupport {
 
         mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef)))
             .andExpect(jsonPath("$.status").value("READY"));
-        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef)))
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(waiter)))
             .andExpect(jsonPath("$.status").value("SERVED"));
 
         mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/queue").with(as(chef)))

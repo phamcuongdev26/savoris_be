@@ -89,7 +89,7 @@ class SecurityRulesTest extends IntegrationTestSupport {
         MenuItemEntity dish = createMenuItem("Pho " + unique(), 50000);
 
         mockMvc.perform(get("/orders/branch/" + branch.getId()).with(as(chef)))
-            .andExpect(status().isOk());
+            .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/orders").with(as(chef)).contentType(MediaType.APPLICATION_JSON)
                 .content(orderJson(branch, "DINE_IN", table(branch, 1), dish(dish, 1))))
@@ -108,6 +108,123 @@ class SecurityRulesTest extends IntegrationTestSupport {
         // STAFF has no kitchen access (blocked by @PreAuthorize before state check)
         mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(cashier)))
             .andExpect(status().isForbidden());
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(cashier)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readEndpointsFollowFrontOfHouseKitchenAndManagementRoles() throws Exception {
+        int branchId = branch.getId();
+        int tableId = table(branch, 1);
+        MenuItemEntity dish = createMenuItem("Payment permission " + unique(), 50000);
+        String orderResponse = mockMvc.perform(post("/orders").with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+                .content(orderJson(branch, "DINE_IN", tableId, dish(dish, 1))))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        int orderId = com.jayway.jsonpath.JsonPath.read(orderResponse, "$.id");
+        String paymentResponse = pay(waiter, orderId, 50000)
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        int paymentId = com.jayway.jsonpath.JsonPath.read(paymentResponse, "$.id");
+
+        // STAFF can use floor, order, and reservation reads, but cannot inspect kitchen queues.
+        mockMvc.perform(get("/branches/" + branchId + "/tables").with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches/" + branchId + "/areas").with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/orders/branch/" + branchId).with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/reservations/branch/" + branchId).with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches").with(as(waiter)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(branchId))
+            .andExpect(jsonPath("$[0].name").exists())
+            .andExpect(jsonPath("$[0].address").doesNotExist())
+            .andExpect(jsonPath("$[0].phone").doesNotExist())
+            .andExpect(jsonPath("$[0].email").doesNotExist())
+            .andExpect(jsonPath("$[0].managerId").doesNotExist())
+            .andExpect(jsonPath("$[0].kitchenCapacity").doesNotExist());
+        mockMvc.perform(get("/branches/search?q=Test").with(as(waiter)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/payments/" + paymentId).with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/payments/order/" + orderId).with(as(waiter)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/queue").with(as(waiter)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/void-queue").with(as(waiter)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/load").with(as(waiter)))
+            .andExpect(status().isForbidden());
+
+        // CHEF can inspect kitchen data, not customer/order/floor-management data.
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/queue").with(as(chef)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/void-queue").with(as(chef)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/load").with(as(chef)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches/" + branchId + "/tables").with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/branches/" + branchId + "/areas").with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/orders/branch/" + branchId).with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/orders/999999").with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/reservations/branch/" + branchId).with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/branches").with(as(chef)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(branchId))
+            .andExpect(jsonPath("$[0].address").doesNotExist())
+            .andExpect(jsonPath("$[0].phone").doesNotExist())
+            .andExpect(jsonPath("$[0].email").doesNotExist())
+            .andExpect(jsonPath("$[0].managerId").doesNotExist())
+            .andExpect(jsonPath("$[0].kitchenCapacity").doesNotExist());
+        mockMvc.perform(get("/branches/search?q=Test").with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/reservations/999999").with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/payments/" + paymentId).with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/payments/order/" + orderId).with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/staff/" + waiter.getId()).with(as(chef)))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/branches/" + branchId).with(as(chef)))
+            .andExpect(status().isForbidden());
+
+        // Managers and the owner retain their documented operational reads.
+        mockMvc.perform(get("/branches/" + branchId + "/areas").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches").with(as(manager)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].address").value(branch.getAddress()));
+        mockMvc.perform(get("/branches/search?q=Test").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches/" + branchId + "/tables").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/orders/branch/" + branchId).with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/reservations/branch/" + branchId).with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/queue").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/void-queue").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/kitchen/branches/" + branchId + "/load").with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches/" + branchId).with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/staff/" + waiter.getId()).with(as(manager)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/branches/" + branchId + "/tables").with(as(owner)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/reservations/branch/" + branchId).with(as(owner)))
+            .andExpect(status().isOk());
     }
 
     @Test
