@@ -35,6 +35,7 @@ import com.savoris.repository.PaymentRepository;
 import com.savoris.repository.StaffRepository;
 import com.savoris.security.BranchAccessGuard;
 import com.savoris.service.KitchenService;
+import com.savoris.service.KitchenQueueEvents;
 import com.savoris.service.OrderCodeGenerator;
 import com.savoris.service.OrderService;
 import com.savoris.service.SettingService;
@@ -76,6 +77,7 @@ public class OrderServiceImpl implements OrderService {
     private final StaffRepository staffRepository;
     private final SettingService settingService;
     private final AreaRepository areaRepository;
+    private final KitchenQueueEvents kitchenQueueEvents;
 
     @Override
     @Transactional
@@ -120,6 +122,7 @@ public class OrderServiceImpl implements OrderService {
             diningTableRepository.updateStatus(savedOrder.getTableId(), TableStatus.OCCUPIED);
         }
 
+        kitchenQueueEvents.changed(branchId);
         log.info("Created order {} for branch {}", savedOrder.getCode(), branchId);
         return toResponse(savedOrder, savedItems);
     }
@@ -170,6 +173,7 @@ public class OrderServiceImpl implements OrderService {
         orderItemRepository.saveAll(items);
         recalculate(order);
 
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Added {} dishes to order {}", items.size(), order.getCode());
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
@@ -208,6 +212,7 @@ public class OrderServiceImpl implements OrderService {
         orderItemRepository.saveAll(items);
         recalculate(order);
 
+        kitchenQueueEvents.changed(branchId);
         log.info("Guest at table {} ordered {} dishes on {}", table.getName(), items.size(), order.getCode());
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
@@ -278,6 +283,7 @@ public class OrderServiceImpl implements OrderService {
         orderItemRepository.save(cancelled);
         recalculate(order);
 
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Cancelled {} on order {} ({})", item.getItemName(), order.getCode(), reason);
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
@@ -309,6 +315,7 @@ public class OrderServiceImpl implements OrderService {
         updated.setVoidRequestedBy(staffId);
         orderItemRepository.save(updated);
 
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Void requested for item {} on order {} by staff {}: {}", itemId, order.getCode(), staffId, reason);
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
@@ -377,6 +384,7 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Void resolved ({}) for item {} on order {} by staff {}", resolution, itemId, order.getCode(), staffId);
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }
@@ -494,6 +502,7 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
         releaseTable(order);
 
+        kitchenQueueEvents.changed(order.getBranchId());
         log.info("Cancelled order {}", order.getCode());
         return toResponse(order, orderItemRepository.findByOrderId(orderId));
     }

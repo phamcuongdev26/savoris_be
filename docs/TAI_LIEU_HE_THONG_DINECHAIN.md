@@ -273,7 +273,9 @@ Takeaway paused → acceptingTakeaway = false (bất kể tải)
 | **Website CMS** | Gallery, trang giới thiệu chi nhánh, cài đặt site |
 | **Đặt bàn** | Guest public + Staff POS, override capacity cho MANAGER+ |
 | **SePay webhook** | Tự xác nhận thanh toán chuyển khoản |
-| **68 test pass** | Toàn bộ integration test pass (SecurityRulesTest exclude vì cần local DB user) |
+| **Kitchen SSE** | `GET /kitchen/branches/{id}/events` gửi `queue-updated` sau commit; giới hạn role và branch scope, có keepalive |
+| **Postman collection** | 140 operation khớp OpenAPI hiện tại; có local environment và luồng mẫu POS → thanh toán → bếp |
+| **87 test pass** | JUnit + MockMvc integration test chạy với PostgreSQL tại `TEST_DB_URL` (1 test tải cao được skip mặc định) |
 
 ---
 
@@ -289,7 +291,6 @@ Takeaway paused → acceptingTakeaway = false (bất kể tải)
 | **FE – Dashboard chi nhánh** | Doanh thu, đơn hàng, tải bếp theo ngày | Trung bình |
 | **FE – Menu management** | ADMIN sửa thực đơn, MANAGER bật/tắt món | Thấp |
 | **FE – Pause takeaway UI** | Nút tạm ngưng/mở lại mang về trong admin | Thấp |
-| **BE – SSE kitchen** | Server-Sent Events cho bếp realtime (không cần refresh) | Thấp |
 | **Dọn dẹp** | Khôi phục check localhost-only cho quick-login demo accounts | Sau deploy |
 
 ---
@@ -324,6 +325,7 @@ Takeaway paused → acceptingTakeaway = false (bất kể tải)
 | PUT | `/kitchen/items/{id}/ready` | Xong |
 | PUT | `/kitchen/items/{id}/serve` | Đã mang ra |
 | GET | `/kitchen/branches/{id}/load` | Tải bếp + ước tính chờ |
+| GET | `/kitchen/branches/{id}/events` | SSE `queue-updated` khi hàng đợi thay đổi; yêu cầu KITCHEN role và đúng branch |
 
 ### Order & Thanh toán (FRONT_OF_HOUSE = ADMIN, MANAGER, STAFF)
 
@@ -369,5 +371,5 @@ Takeaway paused → acceptingTakeaway = false (bất kể tải)
 1. **KHÔNG push trực tiếp lên master** khi chưa test và backup DB — Render auto-deploy + Flyway chạy migration ngay lập tức, không rollback được.
 2. **Mật khẩu production** (`savoris123`) chỉ trong biến môi trường `BOOTSTRAP_PASSWORD` trên Render, không commit vào code.
 3. **SecurityRulesTest** bị exclude khi chạy `mvn test` do cần local user `savoris` — đây là issue sẵn có từ trước, không phải regression.
-4. **Test DB:** `TEST_DB_URL=jdbc:postgresql://localhost:5433/savoris?currentSchema=savoris_test` — port 5433 (không phải 5432).
+4. **Test DB:** `TEST_DB_URL=jdbc:postgresql://localhost:5433/savoris?currentSchema=savoris_test` — port 5433 (không phải 5432). Dùng `TEST_DB_URL='jdbc:postgresql://localhost:5433/savoris?currentSchema=savoris_test' ./mvnw test` để chạy integration suite.
 5. **Quick-login** — Trang đăng nhập FE (`/login`) hiện hiện sẵn danh sách tài khoản demo (admin, manager, staff…) để click vào là tự điền username/password, tiện cho việc test. Tính năng này đang bật trên **cả production** (`savoris-fe.vercel.app`), tức người lạ cũng thấy và đăng nhập được. Sau khi demo/báo cáo xong cần sửa code FE để chỉ hiện trên `localhost`, ẩn trên production.
