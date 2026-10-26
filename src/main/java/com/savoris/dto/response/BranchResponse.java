@@ -25,6 +25,7 @@ public class BranchResponse {
     private Double longitude;
     private Integer managerId;
     private Integer kitchenCapacity;
+    private Boolean takeawayPaused;
     private BranchStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -42,6 +43,7 @@ public class BranchResponse {
         response.setLongitude(entity.getLongitude());
         response.setManagerId(entity.getManagerId());
         response.setKitchenCapacity(entity.getKitchenCapacity());
+        response.setTakeawayPaused(entity.getTakeawayPaused());
         response.setStatus(entity.getStatus());
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());

@@ -379,6 +379,28 @@ class AuthBranchHttpTest {
         assertEquals(403, exchange(HttpMethod.PUT, "/admin/website/hours/week", weekOther, manager2Cookie).statusCode());
     }
 
+    @Test
+    void pauseAndResumeTakeawayIsRestrictedToManagement() throws Exception {
+        String adminCookie   = accessCookie(login("admin-http",   "Correct@123"));
+        String managerCookie = accessCookie(login("manager-http", "Correct@123"));
+        String chefCookie    = accessCookie(login("chef-http",    "Correct@123"));
+
+        // CHEF cannot pause
+        assertEquals(403, exchange(HttpMethod.PUT, "/branches/" + cn1.getId() + "/takeaway/pause",   "{}", chefCookie).statusCode());
+        // MANAGER can pause own branch
+        HttpResponse<String> paused = exchange(HttpMethod.PUT, "/branches/" + cn1.getId() + "/takeaway/pause", "{}", managerCookie);
+        assertEquals(200, paused.statusCode());
+        assertTrue(paused.body().contains("\"takeawayPaused\":true"));
+        // MANAGER cannot pause another branch
+        assertEquals(403, exchange(HttpMethod.PUT, "/branches/" + cn2.getId() + "/takeaway/pause", "{}", managerCookie).statusCode());
+        // ADMIN can pause any branch
+        assertEquals(200, exchange(HttpMethod.PUT, "/branches/" + cn2.getId() + "/takeaway/pause", "{}", adminCookie).statusCode());
+        // MANAGER can resume own branch
+        HttpResponse<String> resumed = exchange(HttpMethod.PUT, "/branches/" + cn1.getId() + "/takeaway/resume", "{}", managerCookie);
+        assertEquals(200, resumed.statusCode());
+        assertTrue(resumed.body().contains("\"takeawayPaused\":false"));
+    }
+
     private HttpResponse<String> login(String username, String password) throws Exception {
         String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
         return CLIENT.send(HttpRequest.newBuilder(URI.create(url("/auth/login")))

@@ -112,6 +112,22 @@ public class BranchController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{branchId}/takeaway/pause")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Operation(summary = "Tạm ngưng nhận đơn mang về", description = "Chặn mọi đơn WEB_TAKEAWAY mới tại chi nhánh cho đến khi resume")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<BranchResponse> pauseTakeaway(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(branchService.setTakeawayPaused(staffId, branchId, true));
+    }
+
+    @PutMapping("/{branchId}/takeaway/resume")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Operation(summary = "Mở lại nhận đơn mang về")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<BranchResponse> resumeTakeaway(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(branchService.setTakeawayPaused(staffId, branchId, false));
+    }
+
     @GetMapping
     @Operation(
         summary = "Danh sách chi nhánh",

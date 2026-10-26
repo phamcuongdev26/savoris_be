@@ -62,6 +62,9 @@ public class BranchEntity {
     @Column(name = "kitchen_capacity")
     private Integer kitchenCapacity;
 
+    @Column(name = "takeaway_paused", nullable = false)
+    private Boolean takeawayPaused = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

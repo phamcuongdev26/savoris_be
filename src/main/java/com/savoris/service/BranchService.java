@@ -16,4 +16,5 @@ public interface BranchService {
     List<BranchResponse> getBranchesFor(Integer staffId);
     List<BranchResponse> searchBranches(String name);
     List<BranchResponse> searchBranches(Integer staffId, String name);
+    BranchResponse setTakeawayPaused(Integer staffId, Integer branchId, boolean paused);
 }

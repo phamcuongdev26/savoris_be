@@ -142,6 +142,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void checkKitchenAcceptsTakeaway(BranchEntity branch) {
+        if (Boolean.TRUE.equals(branch.getTakeawayPaused())) {
+            throw new AppException(ErrorCode.BRANCH_BUSY, "Chi nhánh tạm ngưng nhận đơn mang về.");
+        }
         BranchLoadResponse load = kitchenService.computeLoad(branch);
         if (!load.isAcceptingTakeaway()) {
             String wait = load.getEstimatedWaitMinutes() != null

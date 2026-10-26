@@ -207,7 +207,9 @@ public class KitchenServiceImpl implements KitchenService {
             : loadPercent >= BUSY_PERCENT ? KitchenLoadStatus.BUSY
             : KitchenLoadStatus.NORMAL;
 
+        boolean acceptingTakeaway = status != KitchenLoadStatus.OVERLOADED
+            && !Boolean.TRUE.equals(branch.getTakeawayPaused());
         return new BranchLoadResponse(branch.getId(), pending, cooking, capacity, loadPercent, readyRecently,
-            waitMinutes, status, status != KitchenLoadStatus.OVERLOADED);
+            waitMinutes, status, acceptingTakeaway);
     }
 }

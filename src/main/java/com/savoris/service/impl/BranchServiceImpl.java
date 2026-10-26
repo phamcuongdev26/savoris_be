@@ -139,4 +139,15 @@ public class BranchServiceImpl implements BranchService {
             .filter(branch -> branch.getId().equals(user.getBranchId()))
             .toList();
     }
+
+    @Override
+    @Transactional
+    public BranchResponse setTakeawayPaused(Integer staffId, Integer branchId, boolean paused) {
+        branchAccessGuard.check(staffId, branchId);
+        BranchEntity branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND, "Branch not found: " + branchId));
+        branch.setTakeawayPaused(paused);
+        log.info("Branch {} takeaway {}", branch.getCode(), paused ? "PAUSED" : "RESUMED");
+        return BranchResponse.from(branchRepository.save(branch));
+    }
 }
