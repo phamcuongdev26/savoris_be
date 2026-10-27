@@ -62,6 +62,7 @@ public class CustomerSupportService {
         var staff = branchGuard.currentUser(staffId);
         List<CustomerSupportTicketEntity> found = staff.getRole() == StaffRole.ADMIN
             ? tickets.findAllByOrderByUpdatedAtDesc()
+            : staff.getBranchId() == null ? List.of()
             : tickets.findByBranchIdOrderByUpdatedAtDesc(staff.getBranchId());
         return found.stream().map(SupportTicketResponse::from).toList();
     }

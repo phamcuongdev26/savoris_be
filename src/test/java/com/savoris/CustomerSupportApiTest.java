@@ -83,6 +83,9 @@ class CustomerSupportApiTest extends IntegrationTestSupport {
         mockMvc.perform(patch("/support-tickets/{id}", ticketId).with(as(firstStaff)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+        mockMvc.perform(patch("/support-tickets/{id}", ticketId).with(as(firstStaff)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"RESOLVED\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("RESOLVED"));
     }
 
     @Test

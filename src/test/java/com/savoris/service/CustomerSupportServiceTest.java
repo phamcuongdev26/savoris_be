@@ -59,6 +59,14 @@ class CustomerSupportServiceTest {
     }
 
     @Test
+    void doesNotExposeUnassignedTicketsToStaffWithoutBranch() {
+        when(branchGuard.currentUser(8)).thenReturn(StaffEntity.builder().id(8).role(StaffRole.STAFF).branchId(null).build());
+        assertThat(service.list(8)).isEmpty();
+        verify(tickets, never()).findByBranchIdOrderByUpdatedAtDesc(null);
+        verify(tickets, never()).findAllByOrderByUpdatedAtDesc();
+    }
+
+    @Test
     void checksBranchAuthorizationBeforeUpdatingTicket() {
         CustomerSupportTicketEntity ticket = new CustomerSupportTicketEntity();
         ticket.setId(41L); ticket.setBranchId(3); ticket.setStatus("OPEN");
