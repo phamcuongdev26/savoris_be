@@ -1,13 +1,15 @@
 package com.savoris.controller;
 
 import com.savoris.dto.response.BranchLoadResponse;
+import com.savoris.dto.response.KitchenForecastResponse;
 import com.savoris.dto.response.KitchenTicketResponse;
 import com.savoris.security.CurrentUser;
+import com.savoris.security.Roles;
+import com.savoris.service.KitchenForecastService;
 import com.savoris.service.KitchenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.savoris.security.Roles;
 import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,15 @@ import java.util.List;
 public class KitchenController {
 
     private final KitchenService kitchenService;
+    private final KitchenForecastService kitchenForecastService;
+
+    @GetMapping("/branches/{branchId}/insight")
+    @Operation(summary = "AI Kitchen Insight", description = "AI tóm tắt tải bếp hiện tại, món đang chờ nhiều nhất và xu hướng hai giờ tới.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize(Roles.KITCHEN)
+    public ResponseEntity<KitchenForecastResponse> getInsight(@CurrentUser Integer staffId, @PathVariable Integer branchId) {
+        return ResponseEntity.ok(kitchenForecastService.forecast(staffId, branchId));
+    }
 
     @GetMapping("/branches/{branchId}/queue")
     @Operation(summary = "Hàng đợi bếp", description = "Các món chờ nấu, đang nấu, đã xong chờ bưng; món gọi trước đứng trước")

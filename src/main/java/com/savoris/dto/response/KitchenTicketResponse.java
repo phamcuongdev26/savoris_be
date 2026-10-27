@@ -31,11 +31,13 @@ public class KitchenTicketResponse {
     private Integer cookedBy;
     private LocalDateTime orderedAt;
     private long waitingMinutes;
+    private LocalDateTime cookingStartedAt;
     private String voidReason;
     private VoidResolution voidResolution;
     private boolean awaitingPayment;
 
     public static KitchenTicketResponse from(OrderItemEntity item, OrderEntity order, LocalDateTime now) {
+        long waitingMinutes = Duration.between(item.getOrderedAt(), now).toMinutes();
         KitchenTicketResponse r = new KitchenTicketResponse(
             item.getId(),
             order.getId(),
@@ -49,7 +51,8 @@ public class KitchenTicketResponse {
             item.getStatus(),
             item.getCookedBy(),
             item.getOrderedAt(),
-            Duration.between(item.getOrderedAt(), now).toMinutes(),
+            waitingMinutes,
+            item.getCookingStartedAt(),
             item.getVoidReason(),
             item.getVoidResolution(),
             order.getStatus() == com.savoris.constant.OrderStatus.AWAITING_PAYMENT

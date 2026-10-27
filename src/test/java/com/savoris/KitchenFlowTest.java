@@ -76,7 +76,7 @@ class KitchenFlowTest extends IntegrationTestSupport {
 
         // Cannot skip steps or go back
         mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef)))
-            .andExpect(status().isConflict());
+            .andExpect(status().isForbidden());
         mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef)))
             .andExpect(status().isConflict());
 
@@ -110,6 +110,47 @@ class KitchenFlowTest extends IntegrationTestSupport {
         } finally {
             pool.shutdown();
         }
+    }
+
+    @Test
+    void kitchenVoidResolutionsAcceptRemakeAndChargeUseExistingFlow() throws Exception {
+        for (String resolution : List.of("ACCEPT", "REMAKE", "CHARGE")) {
+            String orderJson = order("DINE_IN", table(branch, 1), dish(pho, 1));
+            int orderId = JsonPath.read(orderJson, "$.id");
+            int itemId = JsonPath.read(orderJson, "$.items[0].id");
+
+            mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef)))
+                .andExpect(status().isOk());
+            mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-request")
+                    .with(as(waiter)).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Khách đổi món\"}"))
+                .andExpect(status().isOk());
+            mockMvc.perform(get("/kitchen/branches/" + branch.getId() + "/void-queue").with(as(chef)))
+                .andExpect(status().isOk());
+            mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-resolve")
+                    .with(as(chef)).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"resolution\":\"" + resolution + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value("CHARGE".equals(resolution) ? "READY" : "CANCELLED"));
+            if ("REMAKE".equals(resolution)) {
+                mockMvc.perform(get("/orders/" + orderId).with(as(waiter)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items", hasSize(2)))
+                    .andExpect(jsonPath("$.items[1].status").value("PENDING"));
+            }
+        }
+    }
+
+    @Test
+    void chefCannotMarkReadyDishAsServed() throws Exception {
+        int itemId = JsonPath.read(order("DINE_IN", table(branch, 1), dish(pho, 1)), "$.items[0].id");
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef)))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef)))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/served").with(as(chef)))
+            .andExpect(status().isForbidden());
     }
 
     @Test

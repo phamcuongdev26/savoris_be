@@ -8,6 +8,7 @@ import com.savoris.constant.StaffStatus;
 import com.savoris.dto.response.BranchLoadResponse;
 import com.savoris.dto.response.KitchenForecastResponse;
 import com.savoris.entity.BranchEntity;
+import com.savoris.constant.OrderItemStatus;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
 import com.savoris.repository.BranchRepository;
@@ -28,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Service
@@ -63,6 +66,19 @@ public class KitchenForecastService {
         int currentLoad = sampleData ? 64 : load.getLoadPercent();
         int chefs = sampleData ? 4 : (int) staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE).stream()
             .filter(staff -> staff.getRole() == StaffRole.CHEF).count();
+        String pendingByItem = sampleData ? "Dữ liệu mô phỏng: Beef Steak ×9, Pasta ×6"
+            : kitchenService.getQueue(staffId, branchId).stream()
+                .filter(ticket -> ticket.getStatus() == OrderItemStatus.PENDING)
+                .collect(Collectors.groupingBy(
+                    ticket -> ticket.getItemName() == null ? "Món chưa có tên" : ticket.getItemName(),
+                    TreeMap::new,
+                    Collectors.summingLong(ticket -> ticket.getQuantity() == null ? 0 : ticket.getQuantity())))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> entry.getKey() + " ×" + entry.getValue())
+                .collect(Collectors.joining(", "));
+        if (pendingByItem.isBlank()) pendingByItem = "Không có món đang chờ nấu";
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         int databaseToBusinessShiftMinutes = databaseToBusinessShiftMinutes();
         Map<java.time.LocalDate, List<HistoryRow>> historyByBusinessDate = new HashMap<>();
@@ -85,7 +101,8 @@ public class KitchenForecastService {
             + "\nSức chứa bếp: " + capacity + " món/giờ\nSố đầu bếp ACTIVE: " + chefs
             + " (số tài khoản, không phải xác nhận đang có mặt)\nĐang chờ nấu: " + pending
             + " món\nĐang nấu: " + cooking + " món\nTải hiện tại: " + currentLoad
-            + "%\nLịch sử bốn tuần gần nhất theo đúng thứ của từng giờ dự báo, trung bình theo giờ: " + nextHours
+            + "%\nMón chờ theo tên và số phần, đã sắp từ nhiều đến ít: " + pendingByItem
+            + "\nLịch sử bốn tuần gần nhất theo đúng thứ của từng giờ dự báo, trung bình theo giờ: " + nextHours
             + "\nDự báo tải 2 giờ kế tiếp. risk chỉ thuộc LOW, NORMAL, MEDIUM, HIGH, OVERLOADED. predictedLoad là phần trăm. "
             + "Trả JSON: {\"forecast\":[{\"hour\":\"19h\",\"predictedLoad\":95,\"risk\":\"HIGH\"},"
             + "{\"hour\":\"20h\",\"predictedLoad\":110,\"risk\":\"OVERLOADED\"}],\"alert\":\"...\","
