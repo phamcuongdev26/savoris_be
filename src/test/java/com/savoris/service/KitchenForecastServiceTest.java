@@ -33,6 +33,43 @@ import static org.mockito.Mockito.when;
 
 class KitchenForecastServiceTest {
     @Test
+    void sampleForecastSendsClearlyLabeledSyntheticDataToTheAiProvider() {
+        AiModelClient ai = mock(AiModelClient.class);
+        BranchRepository branches = mock(BranchRepository.class);
+        StaffRepository staff = mock(StaffRepository.class);
+        BranchAccessGuard access = mock(BranchAccessGuard.class);
+        KitchenService kitchen = mock(KitchenService.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        BranchEntity branch = new BranchEntity();
+        branch.setId(7);
+        branch.setName("Hoàn Kiếm");
+        branch.setKitchenCapacity(40);
+        when(ai.isConfigured()).thenReturn(true);
+        when(branches.findById(7)).thenReturn(Optional.of(branch));
+        when(ai.complete(anyList(), anyList(), anyBoolean())).thenReturn(new AiModelClient.AiCompletion(
+            "{\"forecast\":[{\"hour\":\"19h\",\"predictedLoad\":95,\"risk\":\"HIGH\"},"
+                + "{\"hour\":\"20h\",\"predictedLoad\":110,\"risk\":\"OVERLOADED\"}],"
+                + "\"alert\":\"Bếp có nguy cơ quá tải\",\"actions\":[\"Gọi thêm đầu bếp\"],\"suggestedPauseAt\":\"19:30\"}", List.of()));
+
+        var result = new KitchenForecastService(ai, branches, staff, access, kitchen, jdbc, new ObjectMapper())
+            .forecast(9, 7, true);
+
+        assertThat(result.sampleData()).isTrue();
+        assertThat(result.history()).hasSize(24);
+        assertThat(result.history()).anySatisfy(hour -> {
+            assertThat(hour.averageOrders()).isEqualTo(22.0);
+            assertThat(hour.averagePortions()).isEqualTo(71.0);
+        });
+        assertThat(result.forecast()).hasSize(2);
+        assertThat(result.dataNote()).contains("DỮ LIỆU MÔ PHỎNG", "không phản ánh hoạt động thật");
+        org.mockito.ArgumentCaptor<List<Map<String, Object>>> messages = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(ai).complete(messages.capture(), anyList(), anyBoolean());
+        assertThat(messages.getValue().get(1).get("content").toString())
+            .contains("kịch bản dữ liệu mô phỏng", "Sức chứa bếp: 50", "Đang chờ nấu: 24", "71.0");
+        org.mockito.Mockito.verifyNoInteractions(staff, kitchen, jdbc);
+    }
+
+    @Test
     void loadsHistoryForEachForecastWeekdayInHanoiBusinessTime() {
         AiModelClient ai = mock(AiModelClient.class);
         BranchRepository branches = mock(BranchRepository.class);

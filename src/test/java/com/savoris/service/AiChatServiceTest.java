@@ -61,7 +61,8 @@ class AiChatServiceTest {
         ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
         verify(ai, times(2)).complete(messages.capture(), anyList(), anyBoolean());
         assertThat(messages.getAllValues().get(0).get(0).get("content").toString())
-            .contains("Kiến thức Savoris đã xác minh", "SePay", "không suy đoán", "AI Agent", "dữ liệu đơn hàng");
+            .contains("Kiến thức Savoris đã xác minh", "SePay", "không suy đoán", "AI Agent", "dữ liệu đơn hàng",
+                "không lặp lại lời chào", "xưng mình", "một câu hỏi làm rõ", "đánh số từng bước");
         Map<String, Object> assistant = messages.getAllValues().get(1).stream()
             .filter(message -> "assistant".equals(message.get("role"))).findFirst().orElseThrow();
         List<Map<String, Object>> calls = (List<Map<String, Object>>) assistant.get("tool_calls");

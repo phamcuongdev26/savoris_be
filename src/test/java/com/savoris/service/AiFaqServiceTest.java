@@ -57,8 +57,8 @@ class AiFaqServiceTest {
         String booking = faq.answer("Tôi đặt bàn thế nào?").orElseThrow();
         String takeaway = faq.answer("Đặt món mang về và thanh toán bằng QR thế nào?").orElseThrow();
 
-        assertThat(booking).contains("đặt bàn", "/dat-ban");
-        assertThat(takeaway).contains("mang về", "chuyển khoản", "SePay");
+        assertThat(booking).contains("Bước 1: Bấm “Đặt bàn”", "Bước 2: Chọn chi nhánh", "Bước 3: Chọn ngày, giờ", "Bước 4: Nhập");
+        assertThat(takeaway).contains("Bước 1: Bấm “Mang về”", "Bước 2: Chọn món", "Bước 3: Nhập tên, số điện thoại", "Bước 5: Gửi đơn", "SePay");
     }
 
     @Test

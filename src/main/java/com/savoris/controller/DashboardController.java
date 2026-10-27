@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -47,10 +48,11 @@ public class DashboardController {
 
     @GetMapping("/branch/{branchId}/kitchen-forecast")
     @PreAuthorize(Roles.MANAGEMENT)
-    @Operation(summary = "Dự báo tải bếp 2 giờ tới", description = "Dùng tải bếp hiện tại và lịch sử bốn tuần cùng thứ; chỉ manager/admin của chi nhánh.")
+    @Operation(summary = "Dự báo tải bếp 2 giờ tới", description = "Dùng tải bếp hiện tại và lịch sử bốn tuần cùng thứ; sampleData=true gửi kịch bản giả lập qua AI để kiểm thử; chỉ manager/admin của chi nhánh.")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<KitchenForecastResponse> getKitchenForecast(
-            @PathVariable Integer branchId, @CurrentUser Integer staffId) {
-        return ResponseEntity.ok(kitchenForecastService.forecast(staffId, branchId));
+            @PathVariable Integer branchId, @CurrentUser Integer staffId,
+            @RequestParam(defaultValue = "false") boolean sampleData) {
+        return ResponseEntity.ok(kitchenForecastService.forecast(staffId, branchId, sampleData));
     }
 }

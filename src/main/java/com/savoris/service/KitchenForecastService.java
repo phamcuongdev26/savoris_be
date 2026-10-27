@@ -14,6 +14,7 @@ import com.savoris.repository.BranchRepository;
 import com.savoris.repository.StaffRepository;
 import com.savoris.security.BranchAccessGuard;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class KitchenForecastService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final List<String> RISKS = List.of("LOW", "NORMAL", "MEDIUM", "HIGH", "OVERLOADED");
@@ -47,33 +49,42 @@ public class KitchenForecastService {
     private final ObjectMapper mapper;
 
     public KitchenForecastResponse forecast(Integer staffId, Integer branchId) {
+        return forecast(staffId, branchId, false);
+    }
+
+    public KitchenForecastResponse forecast(Integer staffId, Integer branchId, boolean sampleData) {
         if (!ai.isConfigured()) throw new AppException(ErrorCode.AI_NOT_CONFIGURED);
         branchAccessGuard.check(staffId, branchId);
         BranchEntity branch = branchRepository.findById(branchId).orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND));
-        BranchLoadResponse load = kitchenService.computeLoad(branch);
-        int chefs = (int) staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE).stream()
+        BranchLoadResponse load = sampleData ? null : kitchenService.computeLoad(branch);
+        int capacity = sampleData ? 50 : load.getKitchenCapacity();
+        long pending = sampleData ? 24 : load.getPendingPortions();
+        long cooking = sampleData ? 8 : load.getCookingPortions();
+        int currentLoad = sampleData ? 64 : load.getLoadPercent();
+        int chefs = sampleData ? 4 : (int) staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE).stream()
             .filter(staff -> staff.getRole() == StaffRole.CHEF).count();
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         int databaseToBusinessShiftMinutes = databaseToBusinessShiftMinutes();
         Map<java.time.LocalDate, List<HistoryRow>> historyByBusinessDate = new HashMap<>();
-        List<HistoryRow> history = history(branchId, now, load.getKitchenCapacity(), databaseToBusinessShiftMinutes);
-        historyByBusinessDate.put(now.toLocalDate(), history);
+        List<HistoryRow> history = sampleData ? sampleHistory(now, capacity)
+            : history(branchId, now, capacity, databaseToBusinessShiftMinutes);
+        if (!sampleData) historyByBusinessDate.put(now.toLocalDate(), history);
         LocalDateTime firstHour = now.plusHours(1).withMinute(0).withSecond(0).withNano(0);
         List<HourStat> nextHours = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
             LocalDateTime hour = firstHour.plusHours(i);
-            List<HistoryRow> sameWeekdayHistory = historyByBusinessDate.computeIfAbsent(hour.toLocalDate(),
-                ignored -> history(branchId, hour, load.getKitchenCapacity(), databaseToBusinessShiftMinutes));
+            List<HistoryRow> sameWeekdayHistory = sampleData ? history : historyByBusinessDate.computeIfAbsent(hour.toLocalDate(),
+                ignored -> history(branchId, hour, capacity, databaseToBusinessShiftMinutes));
             String forecastWeekday = hour.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.forLanguageTag("vi-VN"));
             HourStat stat = sameWeekdayHistory.stream().filter(row -> row.hour == hour.getHour()).findFirst()
                 .map(row -> new HourStat(hour, forecastWeekday, row.orders, row.portions, row.load))
                 .orElse(new HourStat(hour, forecastWeekday, 0, 0, 0));
             nextHours.add(stat);
         }
-        String userPrompt = "Chi nhánh: " + branch.getName() + "\nThời điểm hiện tại: " + now
-            + "\nSức chứa bếp: " + load.getKitchenCapacity() + " món/giờ\nSố đầu bếp ACTIVE: " + chefs
-            + " (số tài khoản, không phải xác nhận đang có mặt)\nĐang chờ nấu: " + load.getPendingPortions()
-            + " món\nĐang nấu: " + load.getCookingPortions() + " món\nTải hiện tại: " + load.getLoadPercent()
+        String userPrompt = "Chi nhánh: " + branch.getName() + (sampleData ? " (kịch bản dữ liệu mô phỏng)" : "") + "\nThời điểm hiện tại: " + now
+            + "\nSức chứa bếp: " + capacity + " món/giờ\nSố đầu bếp ACTIVE: " + chefs
+            + " (số tài khoản, không phải xác nhận đang có mặt)\nĐang chờ nấu: " + pending
+            + " món\nĐang nấu: " + cooking + " món\nTải hiện tại: " + currentLoad
             + "%\nLịch sử bốn tuần gần nhất theo đúng thứ của từng giờ dự báo, trung bình theo giờ: " + nextHours
             + "\nDự báo tải 2 giờ kế tiếp. risk chỉ thuộc LOW, NORMAL, MEDIUM, HIGH, OVERLOADED. predictedLoad là phần trăm. "
             + "Trả JSON: {\"forecast\":[{\"hour\":\"19h\",\"predictedLoad\":95,\"risk\":\"HIGH\"},"
@@ -109,14 +120,34 @@ public class KitchenForecastService {
             if (pause != null && !pause.matches("(?:[01]?\\d|2[0-3]):[0-5]\\d")) throw new IllegalArgumentException();
             List<KitchenForecastResponse.HistoricalHour> historyOutput = history.stream().map(row ->
                 new KitchenForecastResponse.HistoricalHour(String.format("%02dh", row.hour), row.orders, row.portions, row.load)).toList();
-            return new KitchenForecastResponse(branchId, branch.getName(), load.getKitchenCapacity(), chefs,
-                load.getPendingPortions(), load.getCookingPortions(), load.getLoadPercent(), historyOutput,
-                output, alert, actions, pause, "Bảng lịch sử là trung bình bốn ngày cùng thứ với ngày hiện tại trong 28 ngày trước; giờ không có đơn được tính 0. "
-                    + "Dữ liệu gửi model được lọc theo đúng thứ địa phương của từng giờ dự báo. Đầu bếp ACTIVE là tài khoản, không phải dữ liệu chấm công.");
+            String note = sampleData
+                ? "DỮ LIỆU MÔ PHỎNG: số liệu được gửi cho AI chỉ để thử nghiệm, không phản ánh hoạt động thật. "
+                : "Bảng lịch sử là trung bình bốn ngày cùng thứ với ngày hiện tại trong 28 ngày trước; giờ không có đơn được tính 0. ";
+            return new KitchenForecastResponse(branchId, branch.getName(), capacity, chefs,
+                pending, cooking, currentLoad, historyOutput,
+                output, alert, actions, pause, note
+                    + "Dữ liệu gửi model được lọc theo đúng thứ địa phương của từng giờ dự báo. Đầu bếp ACTIVE là tài khoản, không phải dữ liệu chấm công.",
+                sampleData);
         } catch (Exception ex) {
             if (ex instanceof AppException app) throw app;
+            log.warn("Kitchen forecast response from AI was invalid (branchId={}, sampleData={}, error={})",
+                branchId, sampleData, ex.getClass().getSimpleName());
             throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
         }
+    }
+
+    private static List<HistoryRow> sampleHistory(LocalDateTime now, int capacity) {
+        int firstHour = now.plusHours(1).getHour();
+        int secondHour = now.plusHours(2).getHour();
+        return IntStream.range(0, 24).mapToObj(hour -> {
+            double orders = 0;
+            double portions = 0;
+            if (hour == firstHour) { orders = 15; portions = 48; }
+            else if (hour == secondHour) { orders = 22; portions = 71; }
+            else if (hour == Math.floorMod(firstHour - 1, 24)) { orders = 8; portions = 24; }
+            else if (hour == Math.floorMod(secondHour + 1, 24)) { orders = 18; portions = 55; }
+            return new HistoryRow(hour, orders, portions, capacity <= 0 ? 0 : round(portions / capacity * 100));
+        }).toList();
     }
 
     private List<HistoryRow> history(Integer branchId, LocalDateTime businessTime, int capacity, int databaseToBusinessShiftMinutes) {

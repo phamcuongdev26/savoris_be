@@ -140,8 +140,10 @@ public class AiFaqService {
     }
 
     private String bookingAnswer() {
-        return "Bạn có thể đặt bàn tại /dat-ban. Chọn chi nhánh, ngày giờ, số khách rồi nhập thông tin liên hệ; "
-            + "hệ thống sẽ cho biết khung giờ còn chỗ trước khi xác nhận.";
+        return "Bước 1: Bấm “Đặt bàn” trên website.\n"
+            + "Bước 2: Chọn chi nhánh bạn muốn đến.\n"
+            + "Bước 3: Chọn ngày, giờ còn chỗ và số khách.\n"
+            + "Bước 4: Nhập tên, số điện thoại rồi gửi yêu cầu; chờ website báo kết quả nhé.";
     }
 
     private boolean isTakeawayPaymentQuestion(String query) {
@@ -151,9 +153,11 @@ public class AiFaqService {
     }
 
     private String takeawayAnswer() {
-        return "Để đặt món mang về, chọn chi nhánh và món trên trang Mang về, rồi nhập tên và số điện thoại. "
-            + "Bạn có thể thanh toán tiền mặt tại quầy hoặc chuyển khoản bằng mã QR nếu chi nhánh đã bật thanh toán này; "
-            + "đơn chuyển khoản chỉ được gửi vào bếp sau khi SePay xác nhận tiền về.";
+        return "Bước 1: Bấm “Mang về” và chọn chi nhánh.\n"
+            + "Bước 2: Chọn món và số lượng.\n"
+            + "Bước 3: Nhập tên, số điện thoại nhận món.\n"
+            + "Bước 4: Chọn thanh toán tại quầy hoặc quét QR nếu chi nhánh hỗ trợ.\n"
+            + "Bước 5: Gửi đơn; đơn chuyển khoản sẽ vào bếp sau khi SePay xác nhận nhé.";
     }
 
     private static String normalize(String value) {

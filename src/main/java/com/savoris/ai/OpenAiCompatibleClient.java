@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.savoris.configuration.AiProperties;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -19,6 +21,7 @@ import java.util.Map;
 
 @Component
 public class OpenAiCompatibleClient implements AiModelClient {
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleClient.class);
     private final AiProperties properties;
     private final ObjectMapper mapper;
     private final HttpClient http;
@@ -57,10 +60,14 @@ public class OpenAiCompatibleClient implements AiModelClient {
                 .build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn("AI provider returned HTTP {}: {}", response.statusCode(), safeProviderMessage(response.body()));
                 throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
             }
             JsonNode message = mapper.readTree(response.body()).path("choices").path(0).path("message");
-            if (message.isMissingNode()) throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
+            if (message.isMissingNode()) {
+                log.warn("AI provider returned an unexpected response: {}", safeProviderMessage(response.body()));
+                throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
+            }
             List<AiToolCall> calls = new ArrayList<>();
             for (JsonNode call : message.path("tool_calls")) {
                 Map<String, Object> extraContent = call.path("extra_content").isObject()
@@ -75,9 +82,17 @@ public class OpenAiCompatibleClient implements AiModelClient {
             throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            log.warn("AI provider request was interrupted");
             throw new AppException(ErrorCode.AI_PROVIDER_FAILED, ex);
         } catch (Exception ex) {
+            log.warn("AI provider request failed ({}): {}", ex.getClass().getSimpleName(), safeProviderMessage(ex.getMessage()));
             throw new AppException(ErrorCode.AI_PROVIDER_FAILED, ex);
         }
+    }
+
+    private String safeProviderMessage(String body) {
+        String safe = body == null ? "<empty response>" : body.replace(properties.getApiKey(), "[REDACTED]");
+        safe = safe.replaceAll("(?i)(bearer\\s+)[^\\s,\\\"]+", "$1[REDACTED]");
+        return safe.length() > 600 ? safe.substring(0, 600) + "…" : safe;
     }
 }
