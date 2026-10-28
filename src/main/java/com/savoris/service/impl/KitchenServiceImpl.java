@@ -97,7 +97,12 @@ public class KitchenServiceImpl implements KitchenService {
     @Override
     @Transactional
     public KitchenTicketResponse markReady(Integer staffId, Integer itemId) {
-        return move(staffId, itemId, OrderItemStatus.COOKING, OrderItemStatus.READY);
+        try {
+            return move(staffId, itemId, OrderItemStatus.PENDING, OrderItemStatus.READY);
+        } catch (AppException exception) {
+            if (exception.getErrorCode() != ErrorCode.INVALID_STATE) throw exception;
+            return move(staffId, itemId, OrderItemStatus.COOKING, OrderItemStatus.READY);
+        }
     }
 
     @Override

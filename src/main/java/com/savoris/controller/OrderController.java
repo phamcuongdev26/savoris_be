@@ -119,7 +119,7 @@ public class OrderController {
     @PutMapping("/{orderId}/items/{itemId}/void-resolve")
     @PreAuthorize(Roles.KITCHEN)
     @Operation(summary = "Bếp xử lý yêu cầu hủy",
-        description = "ACCEPT: hủy + trả kho. REMAKE: làm lại miễn phí. CHARGE: giữ nguyên hóa đơn, bưng ra.")
+        description = "ACCEPT: hủy + trả kho. REJECT: khôi phục trạng thái trước yêu cầu. REMAKE: làm lại miễn phí. CHARGE: giữ nguyên hóa đơn, bưng ra.")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<OrderResponse> resolveVoid(@CurrentUser Integer staffId, @PathVariable Integer orderId,
                                                      @PathVariable Integer itemId,

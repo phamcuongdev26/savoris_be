@@ -142,6 +142,67 @@ class KitchenFlowTest extends IntegrationTestSupport {
     }
 
     @Test
+    void kitchenCanRejectVoidAndRestoreCookingOrReadyStatus() throws Exception {
+        for (String priorStatus : List.of("COOKING", "READY")) {
+            String orderJson = order("DINE_IN", table(branch, 1), dish(pho, 1));
+            int orderId = JsonPath.read(orderJson, "$.id");
+            int itemId = JsonPath.read(orderJson, "$.items[0].id");
+            mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef))).andExpect(status().isOk());
+            if ("READY".equals(priorStatus)) {
+                mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef))).andExpect(status().isOk());
+            }
+            mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-request")
+                    .with(as(waiter)).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Nhầm món\"}"))
+                .andExpect(status().isOk());
+            mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-resolve")
+                    .with(as(chef)).contentType(MediaType.APPLICATION_JSON).content("{\"resolution\":\"REJECT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value(priorStatus));
+            mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-resolve")
+                    .with(as(chef)).contentType(MediaType.APPLICATION_JSON).content("{\"resolution\":\"REJECT\"}"))
+                .andExpect(status().isConflict());
+            assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from order_item_void_history where order_item_id = ? and resolution = 'REJECT'", Integer.class, itemId))
+                .isEqualTo(1);
+        }
+    }
+
+    @Test
+    void chefCanMarkPendingItemReadyWithoutStartingIt() throws Exception {
+        int itemId = JsonPath.read(order("DINE_IN", table(branch, 1), dish(pho, 1)), "$.items[0].id");
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/ready").with(as(chef)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("READY"));
+    }
+
+    @Test
+    void twoChefsCannotResolveTheSameVoidRequestTwice() throws Exception {
+        String orderJson = order("DINE_IN", table(branch, 1), dish(pho, 1));
+        int orderId = JsonPath.read(orderJson, "$.id");
+        int itemId = JsonPath.read(orderJson, "$.items[0].id");
+        mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef))).andExpect(status().isOk());
+        mockMvc.perform(put("/orders/" + orderId + "/items/" + itemId + "/void-request")
+                .with(as(waiter)).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Đổi món\"}"))
+            .andExpect(status().isOk());
+
+        List<StaffEntity> cooks = new ArrayList<>();
+        for (int i = 0; i < 4; i++) cooks.add(createStaff(StaffRole.CHEF, branch));
+        ExecutorService pool = Executors.newFixedThreadPool(cooks.size());
+        try {
+            List<Callable<Integer>> attempts = cooks.stream().<Callable<Integer>>map(cook -> () -> mockMvc
+                .perform(put("/orders/" + orderId + "/items/" + itemId + "/void-resolve")
+                    .with(as(cook)).contentType(MediaType.APPLICATION_JSON).content("{\"resolution\":\"REJECT\"}"))
+                .andReturn().getResponse().getStatus()).toList();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> result : pool.invokeAll(attempts)) statuses.add(result.get());
+            assertThat(statuses).filteredOn(status -> status == 200).hasSize(1);
+            assertThat(statuses).filteredOn(status -> status == 409).hasSize(cooks.size() - 1);
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    @Test
     void chefCannotMarkReadyDishAsServed() throws Exception {
         int itemId = JsonPath.read(order("DINE_IN", table(branch, 1), dish(pho, 1)), "$.items[0].id");
         mockMvc.perform(put("/kitchen/items/" + itemId + "/start").with(as(chef)))

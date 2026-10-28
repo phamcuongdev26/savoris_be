@@ -21,6 +21,7 @@ import com.savoris.entity.DiningTableEntity;
 import com.savoris.entity.MenuItemEntity;
 import com.savoris.entity.OrderEntity;
 import com.savoris.entity.OrderItemEntity;
+import com.savoris.entity.OrderItemVoidHistoryEntity;
 import com.savoris.exception.AppException;
 import com.savoris.exception.ErrorCode;
 import com.savoris.repository.AreaRepository;
@@ -29,6 +30,7 @@ import com.savoris.repository.BranchRepository;
 import com.savoris.repository.DiningTableRepository;
 import com.savoris.repository.MenuItemRepository;
 import com.savoris.repository.OrderItemRepository;
+import com.savoris.repository.OrderItemVoidHistoryRepository;
 import com.savoris.repository.OrderRepository;
 import com.savoris.repository.PaymentRepository;
 import com.savoris.repository.StaffRepository;
@@ -63,6 +65,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderItemVoidHistoryRepository orderItemVoidHistoryRepository;
     private final BranchRepository branchRepository;
     private final MenuItemRepository menuItemRepository;
     private final BranchMenuItemRepository branchMenuItemRepository;
@@ -310,7 +313,18 @@ public class OrderServiceImpl implements OrderService {
         OrderItemEntity updated = orderItemRepository.findById(itemId).orElseThrow();
         updated.setVoidReason(reason);
         updated.setVoidRequestedBy(staffId);
+        updated.setVoidPreviousStatus(from);
+        updated.setVoidRequestedAt(LocalDateTime.now());
+        updated.setVoidResolution(null);
         orderItemRepository.save(updated);
+        OrderItemVoidHistoryEntity history = new OrderItemVoidHistoryEntity();
+        history.setOrderId(orderId);
+        history.setOrderItemId(itemId);
+        history.setRequestedBy(staffId);
+        history.setRequestedAt(updated.getVoidRequestedAt());
+        history.setRequestReason(reason);
+        history.setPreviousStatus(from);
+        orderItemVoidHistoryRepository.save(history);
 
         kitchenQueueEvents.changed(order.getBranchId());
         log.info("Void requested for item {} on order {} by staff {}: {}", itemId, order.getCode(), staffId, reason);
@@ -349,6 +363,19 @@ public class OrderServiceImpl implements OrderService {
                 orderItemRepository.save(accepted);
                 recalculate(order);
             }
+            case REJECT -> {
+                OrderItemStatus previous = item.getVoidPreviousStatus();
+                if (previous != OrderItemStatus.COOKING && previous != OrderItemStatus.READY) {
+                    throw new AppException(ErrorCode.INVALID_STATE, "Không thể khôi phục trạng thái trước yêu cầu hủy");
+                }
+                if (orderItemRepository.transition(itemId, OrderItemStatus.VOID_REQUESTED, previous, now) == 0) {
+                    throw new AppException(ErrorCode.INVALID_STATE, "Xung đột cập nhật đồng thời");
+                }
+                OrderItemEntity rejected = orderItemRepository.findById(itemId).orElseThrow();
+                rejected.setVoidResolution(VoidResolution.REJECT);
+                rejected.setVoidPreviousStatus(null);
+                orderItemRepository.save(rejected);
+            }
             case REMAKE -> {
                 if (orderItemRepository.transition(itemId, OrderItemStatus.VOID_REQUESTED, OrderItemStatus.CANCELLED, now) == 0) {
                     throw new AppException(ErrorCode.INVALID_STATE, "Xung đột cập nhật đồng thời");
@@ -380,6 +407,14 @@ public class OrderServiceImpl implements OrderService {
                 orderItemRepository.save(charged);
             }
         }
+
+        OrderItemVoidHistoryEntity history = orderItemVoidHistoryRepository
+            .findFirstByOrderItemIdAndResolvedAtIsNullOrderByRequestedAtDesc(itemId)
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_STATE, "Không tìm thấy lịch sử yêu cầu hủy đang chờ"));
+        history.setResolution(resolution);
+        history.setResolvedBy(staffId);
+        history.setResolvedAt(now);
+        orderItemVoidHistoryRepository.save(history);
 
         kitchenQueueEvents.changed(order.getBranchId());
         log.info("Void resolved ({}) for item {} on order {} by staff {}", resolution, itemId, order.getCode(), staffId);

@@ -34,6 +34,7 @@ public class KitchenTicketResponse {
     private LocalDateTime cookingStartedAt;
     private String voidReason;
     private VoidResolution voidResolution;
+    private LocalDateTime voidRequestedAt;
     private boolean awaitingPayment;
 
     public static KitchenTicketResponse from(OrderItemEntity item, OrderEntity order, LocalDateTime now) {
@@ -55,6 +56,7 @@ public class KitchenTicketResponse {
             item.getCookingStartedAt(),
             item.getVoidReason(),
             item.getVoidResolution(),
+            item.getVoidRequestedAt(),
             order.getStatus() == com.savoris.constant.OrderStatus.AWAITING_PAYMENT
         );
         return r;

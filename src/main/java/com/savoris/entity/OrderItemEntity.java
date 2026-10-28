@@ -67,6 +67,13 @@ public class OrderItemEntity {
     @Column(name = "void_resolution", length = 20)
     private VoidResolution voidResolution;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "void_previous_status", length = 20)
+    private OrderItemStatus voidPreviousStatus;
+
+    @Column(name = "void_requested_at")
+    private LocalDateTime voidRequestedAt;
+
     @Column(name = "void_requested_by")
     private Integer voidRequestedBy;
 
