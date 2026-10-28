@@ -24,6 +24,8 @@ public interface DiningTableRepository extends JpaRepository<DiningTableEntity, 
 
     boolean existsByAreaId(Integer areaId);
 
+    List<DiningTableEntity> findByAreaIdOrderBySortOrderAscNameAsc(Integer areaId);
+
     // Table names are unique per branch, whatever area they sit in; exceptId skips the table being renamed
     @Query("select count(t) > 0 from DiningTableEntity t join AreaEntity a on a.id = t.areaId "
         + "where a.branchId = :branchId and lower(t.name) = lower(:name) and t.id <> :exceptId")

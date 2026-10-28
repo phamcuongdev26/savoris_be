@@ -1,9 +1,12 @@
 package com.savoris.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public record AreaRequest(
-    @NotBlank(message = "Area name is required") @Size(max = 100) String name
+    @NotBlank(message = "Area name is required") @Size(max = 100) String name,
+    @Size(max = 100) String floorName,
+    @PositiveOrZero Integer floorSortOrder
 ) {
 }

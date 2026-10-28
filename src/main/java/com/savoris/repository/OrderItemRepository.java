@@ -16,6 +16,8 @@ import java.util.List;
 public interface OrderItemRepository extends JpaRepository<OrderItemEntity, Integer> {
     List<OrderItemEntity> findByOrderId(Integer orderId);
 
+    void deleteByOrderId(Integer orderId);
+
     List<OrderItemEntity> findByOrderIdIn(Collection<Integer> orderIds);
 
     @Query("select i from OrderItemEntity i join OrderEntity o on o.id = i.orderId "

@@ -5,9 +5,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.PositiveOrZero;
 
 public record TableRequest(
     @NotBlank(message = "Table name is required") @Size(max = 20) String name,
-    @NotNull(message = "Capacity is required") @Positive @Max(100) Integer capacity
+    @NotNull(message = "Capacity is required") @Positive @Max(100) Integer capacity,
+    @PositiveOrZero Integer positionX,
+    @PositiveOrZero Integer positionY,
+    @PositiveOrZero Integer sortOrder
 ) {
 }

@@ -27,6 +27,18 @@ public class DiningTableEntity {
     @Column(nullable = false)
     private Integer capacity = 4;
 
+    @Column(name = "position_x", nullable = false)
+    @Builder.Default
+    private Integer positionX = 0;
+
+    @Column(name = "position_y", nullable = false)
+    @Builder.Default
+    private Integer positionY = 0;
+
+    @Column(name = "sort_order", nullable = false)
+    @Builder.Default
+    private Integer sortOrder = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TableStatus status = TableStatus.AVAILABLE;

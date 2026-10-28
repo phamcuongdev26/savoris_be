@@ -50,6 +50,8 @@ public class FloorServiceImpl implements FloorService {
         AreaEntity area = new AreaEntity();
         area.setBranchId(branchId);
         area.setName(request.name().trim());
+        area.setFloorName(request.floorName() == null || request.floorName().isBlank() ? request.name().trim() : request.floorName().trim());
+        area.setFloorSortOrder(request.floorSortOrder() == null ? 1 : request.floorSortOrder());
         return AreaResponse.from(areaRepository.save(area));
     }
 
@@ -58,6 +60,8 @@ public class FloorServiceImpl implements FloorService {
     public AreaResponse renameArea(Integer staffId, Integer areaId, AreaRequest request) {
         AreaEntity area = findArea(staffId, areaId);
         area.setName(request.name().trim());
+        if (request.floorName() != null && !request.floorName().isBlank()) area.setFloorName(request.floorName().trim());
+        if (request.floorSortOrder() != null) area.setFloorSortOrder(request.floorSortOrder());
         return AreaResponse.from(areaRepository.save(area));
     }
 
@@ -87,6 +91,10 @@ public class FloorServiceImpl implements FloorService {
         table.setAreaId(areaId);
         table.setName(name);
         table.setCapacity(request.capacity());
+        int next = diningTableRepository.findByAreaIdOrderBySortOrderAscNameAsc(areaId).size();
+        table.setPositionX(request.positionX() == null ? next % 4 : request.positionX());
+        table.setPositionY(request.positionY() == null ? next / 4 : request.positionY());
+        table.setSortOrder(request.sortOrder() == null ? next : request.sortOrder());
         return TableResponse.from(diningTableRepository.save(table));
     }
 
@@ -97,6 +105,9 @@ public class FloorServiceImpl implements FloorService {
         Integer branchId = areaRepository.findById(table.getAreaId()).orElseThrow().getBranchId();
         table.setName(uniqueName(branchId, request.name(), tableId));
         table.setCapacity(request.capacity());
+        if (request.positionX() != null) table.setPositionX(request.positionX());
+        if (request.positionY() != null) table.setPositionY(request.positionY());
+        if (request.sortOrder() != null) table.setSortOrder(request.sortOrder());
         return TableResponse.from(diningTableRepository.save(table));
     }
 

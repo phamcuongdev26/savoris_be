@@ -17,6 +17,8 @@ import java.util.Optional;
 public interface PaymentRepository extends JpaRepository<PaymentEntity, Integer> {
     Optional<PaymentEntity> findByOrderId(Integer orderId);
 
+    void deleteByOrderId(Integer orderId);
+
     @Query("select p.orderId from PaymentEntity p where p.id = :id")
     Optional<Integer> findOrderIdById(@Param("id") Integer id);
 

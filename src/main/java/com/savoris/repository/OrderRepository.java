@@ -21,6 +21,8 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
 
     Optional<OrderEntity> findByCode(String code);
 
+    List<OrderEntity> findByCodeStartingWithOrderByIdAsc(String prefix);
+
     List<OrderEntity> findByBranchIdAndRefundDueAtIsNotNullAndRefundSettledAtIsNullOrderByIdAsc(Integer branchId);
 
     @Query("select o from OrderEntity o where o.status = com.savoris.constant.OrderStatus.AWAITING_PAYMENT "
