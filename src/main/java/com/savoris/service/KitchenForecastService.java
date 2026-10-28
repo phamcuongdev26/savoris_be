@@ -7,6 +7,7 @@ import com.savoris.constant.StaffRole;
 import com.savoris.constant.StaffStatus;
 import com.savoris.dto.response.BranchLoadResponse;
 import com.savoris.dto.response.KitchenForecastResponse;
+import com.savoris.dto.request.KitchenForecastSampleRequest;
 import com.savoris.entity.BranchEntity;
 import com.savoris.constant.OrderItemStatus;
 import com.savoris.exception.AppException;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,17 +58,18 @@ public class KitchenForecastService {
     }
 
     public KitchenForecastResponse forecast(Integer staffId, Integer branchId, boolean sampleData) {
-        if (!ai.isConfigured()) throw new AppException(ErrorCode.AI_NOT_CONFIGURED);
+        if (!sampleData && !ai.isConfigured()) throw new AppException(ErrorCode.AI_NOT_CONFIGURED);
         branchAccessGuard.check(staffId, branchId);
         BranchEntity branch = branchRepository.findById(branchId).orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND));
+        SampleProfile sample = sampleData ? sampleProfile(branchId) : null;
         BranchLoadResponse load = sampleData ? null : kitchenService.computeLoad(branch);
-        int capacity = sampleData ? 50 : load.getKitchenCapacity();
-        long pending = sampleData ? 24 : load.getPendingPortions();
-        long cooking = sampleData ? 8 : load.getCookingPortions();
-        int currentLoad = sampleData ? 64 : load.getLoadPercent();
-        int chefs = sampleData ? 4 : (int) staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE).stream()
+        int capacity = sampleData ? sample.capacity : load.getKitchenCapacity();
+        long pending = sampleData ? sample.pending : load.getPendingPortions();
+        long cooking = sampleData ? sample.cooking : load.getCookingPortions();
+        int currentLoad = sampleData ? sample.currentLoad : load.getLoadPercent();
+        int chefs = sampleData ? sample.chefs : (int) staffRepository.findByBranchIdAndStatus(branchId, StaffStatus.ACTIVE).stream()
             .filter(staff -> staff.getRole() == StaffRole.CHEF).count();
-        String pendingByItem = sampleData ? "Dữ liệu mô phỏng: Beef Steak ×9, Pasta ×6"
+        String pendingByItem = sampleData ? sample.pendingByItem
             : kitchenService.getQueue(staffId, branchId).stream()
                 .filter(ticket -> ticket.getStatus() == OrderItemStatus.PENDING)
                 .collect(Collectors.groupingBy(
@@ -82,7 +85,7 @@ public class KitchenForecastService {
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         int databaseToBusinessShiftMinutes = databaseToBusinessShiftMinutes();
         Map<java.time.LocalDate, List<HistoryRow>> historyByBusinessDate = new HashMap<>();
-        List<HistoryRow> history = sampleData ? sampleHistory(now, capacity)
+        List<HistoryRow> history = sampleData ? sampleHistory(now, capacity, sample)
             : history(branchId, now, capacity, databaseToBusinessShiftMinutes);
         if (!sampleData) historyByBusinessDate.put(now.toLocalDate(), history);
         LocalDateTime firstHour = now.plusHours(1).withMinute(0).withSecond(0).withNano(0);
@@ -107,8 +110,18 @@ public class KitchenForecastService {
             + "Trả JSON: {\"forecast\":[{\"hour\":\"19h\",\"predictedLoad\":95,\"risk\":\"HIGH\"},"
             + "{\"hour\":\"20h\",\"predictedLoad\":110,\"risk\":\"OVERLOADED\"}],\"alert\":\"...\","
             + "\"actions\":[\"...\"],\"suggestedPauseAt\":null} .";
-        AiModelClient.AiCompletion completion = ai.complete(List.of(
-            Map.of("role", "system", "content", SYSTEM), Map.of("role", "user", "content", userPrompt)), List.of(), true);
+        if (sampleData) return fallbackForecast(branchId, branch.getName(), capacity, chefs, pending, cooking,
+            currentLoad, history, nextHours, true);
+        AiModelClient.AiCompletion completion;
+        try {
+            completion = ai.complete(List.of(
+                Map.of("role", "system", "content", SYSTEM), Map.of("role", "user", "content", userPrompt)), List.of(), true);
+        } catch (AppException ex) {
+            if (ex.getErrorCode() != ErrorCode.AI_PROVIDER_FAILED) throw ex;
+            log.warn("AI provider failed for kitchen forecast (branchId={}); using history-based forecast", branchId);
+            return fallbackForecast(branchId, branch.getName(), capacity, chefs, pending, cooking,
+                currentLoad, history, nextHours, false);
+        }
         try {
             JsonNode root = mapper.readTree(completion.content());
             JsonNode forecasts = root.path("forecast");
@@ -149,18 +162,117 @@ public class KitchenForecastService {
             if (ex instanceof AppException app) throw app;
             log.warn("Kitchen forecast response from AI was invalid (branchId={}, sampleData={}, error={})",
                 branchId, sampleData, ex.getClass().getSimpleName());
-            throw new AppException(ErrorCode.AI_PROVIDER_FAILED);
+            return fallbackForecast(branchId, branch.getName(), capacity, chefs, pending, cooking,
+                currentLoad, history, nextHours, false);
         }
     }
 
-    private static List<HistoryRow> sampleHistory(LocalDateTime now, int capacity) {
+    public KitchenForecastResponse forecastFromSample(Integer staffId, Integer branchId,
+        KitchenForecastSampleRequest request) {
+        branchAccessGuard.check(staffId, branchId);
+        BranchEntity branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new AppException(ErrorCode.BRANCH_NOT_FOUND));
+        validateSampleRequest(request);
+
+        int capacity = request.kitchenCapacity();
+        List<HistoryRow> historyByHour = request.history().stream()
+            .map(row -> new HistoryRow(row.hour(), round(row.averageOrders()), round(row.averagePortions()),
+                round(row.averagePortions() / capacity * 100)))
+            .sorted(java.util.Comparator.comparingInt(HistoryRow::hour)).toList();
+        LocalDateTime firstHour = LocalDateTime.now(BUSINESS_ZONE).plusHours(1)
+            .withMinute(0).withSecond(0).withNano(0);
+        List<HourStat> nextHours = IntStream.range(0, 2).mapToObj(i -> {
+            LocalDateTime hour = firstHour.plusHours(i);
+            HistoryRow row = historyByHour.get(hour.getHour());
+            String weekday = hour.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.forLanguageTag("vi-VN"));
+            return new HourStat(hour, weekday, row.orders, row.portions, row.load);
+        }).toList();
+        return fallbackForecast(branchId, branch.getName(), capacity, request.activeChefAccounts(),
+            request.pendingPortions(), request.cookingPortions(), request.currentLoadPercent(),
+            historyByHour, nextHours, true);
+    }
+
+    private static void validateSampleRequest(KitchenForecastSampleRequest request) {
+        if (request == null || request.kitchenCapacity() == null || request.kitchenCapacity() < 1
+            || request.kitchenCapacity() > 500 || request.pendingPortions() == null
+            || request.pendingPortions() < 0 || request.pendingPortions() > 500
+            || request.cookingPortions() == null || request.cookingPortions() < 0
+            || request.cookingPortions() > 500 || request.currentLoadPercent() == null
+            || request.currentLoadPercent() < 0 || request.currentLoadPercent() > 500
+            || request.activeChefAccounts() == null || request.activeChefAccounts() < 0
+            || request.activeChefAccounts() > 100 || request.history() == null || request.history().size() != 24) {
+            throw new AppException(ErrorCode.INVALID_REQUEST,
+                "File demo cần sức chứa, tải hiện tại hợp lệ và đúng 24 dòng lịch sử theo giờ.");
+        }
+        boolean[] seenHours = new boolean[24];
+        for (KitchenForecastSampleRequest.HistoryHour row : request.history()) {
+            if (row == null || row.hour() == null || row.hour() < 0 || row.hour() > 23
+                || seenHours[row.hour()] || !validSampleNumber(row.averageOrders())
+                || !validSampleNumber(row.averagePortions())) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Lịch sử cần đủ giờ 0–23, không trùng giờ và chỉ chứa số không âm.");
+            }
+            seenHours[row.hour()] = true;
+        }
+    }
+
+    private static boolean validSampleNumber(Double value) {
+        return value != null && Double.isFinite(value) && value >= 0 && value <= 1_000_000;
+    }
+
+    private KitchenForecastResponse fallbackForecast(Integer branchId, String branchName, int capacity, int chefs,
+        long pending, long cooking, int currentLoad, List<HistoryRow> history, List<HourStat> nextHours,
+        boolean sampleData) {
+        List<KitchenForecastResponse.ForecastHour> forecast = nextHours.stream().map(hour -> {
+            int predictedLoad = (int) Math.max(0, Math.min(500, Math.round(hour.load)));
+            return new KitchenForecastResponse.ForecastHour(String.format("%02dh", hour.at.getHour()),
+                predictedLoad, riskFor(predictedLoad));
+        }).toList();
+        int peakLoad = forecast.stream().mapToInt(KitchenForecastResponse.ForecastHour::predictedLoad).max().orElse(0);
+        boolean busy = peakLoad >= 100;
+        List<String> actions = busy
+            ? List.of("Chuẩn bị sơ chế trước giờ cao điểm", "Theo dõi hàng đợi và bổ sung người khi cần")
+            : List.of("Duy trì nhân sự hiện tại", "Theo dõi hàng đợi trong hai giờ tới");
+        String pauseAt = peakLoad >= 140 && !nextHours.isEmpty()
+            ? nextHours.get(0).at.format(DateTimeFormatter.ofPattern("HH:mm")) : null;
+        String alert = sampleData
+            ? "Dữ liệu mô phỏng: tải dự báo cao nhất " + peakLoad + "% trong hai giờ tới."
+            : "Dự báo tự động từ lịch sử: tải dự kiến cao nhất " + peakLoad + "% trong hai giờ tới.";
+        String note = sampleData
+            ? "DỮ LIỆU MÔ PHỎNG: số liệu được tạo để kiểm thử, không phản ánh hoạt động thật. "
+            : "AI không trả dữ liệu hợp lệ; dự báo được tính từ trung bình lịch sử theo giờ. ";
+        List<KitchenForecastResponse.HistoricalHour> historyOutput = history.stream().map(row ->
+            new KitchenForecastResponse.HistoricalHour(String.format("%02dh", row.hour), row.orders, row.portions, row.load)).toList();
+        return new KitchenForecastResponse(branchId, branchName, capacity, chefs, pending, cooking, currentLoad,
+            historyOutput, forecast, alert, actions, pauseAt,
+            note + "Đầu bếp ACTIVE là số tài khoản, không xác nhận ca làm.", sampleData);
+    }
+
+    private static String riskFor(int load) {
+        if (load < 50) return "LOW";
+        if (load < 75) return "NORMAL";
+        if (load < 100) return "MEDIUM";
+        if (load < 140) return "HIGH";
+        return "OVERLOADED";
+    }
+
+    private static SampleProfile sampleProfile(Integer branchId) {
+        if (Integer.valueOf(2).equals(branchId)) {
+            return new SampleProfile(36, 11, 4, 42, 3, "Dữ liệu mô phỏng: Gà nướng ×6, Cơm chiên ×3",
+                9, 24, 13, 31);
+        }
+        return new SampleProfile(50, 24, 8, 64, 4, "Dữ liệu mô phỏng: Beef Steak ×9, Pasta ×6",
+            15, 48, 22, 71);
+    }
+
+    private static List<HistoryRow> sampleHistory(LocalDateTime now, int capacity, SampleProfile sample) {
         int firstHour = now.plusHours(1).getHour();
         int secondHour = now.plusHours(2).getHour();
         return IntStream.range(0, 24).mapToObj(hour -> {
             double orders = 0;
             double portions = 0;
-            if (hour == firstHour) { orders = 15; portions = 48; }
-            else if (hour == secondHour) { orders = 22; portions = 71; }
+            if (hour == firstHour) { orders = sample.firstOrders; portions = sample.firstPortions; }
+            else if (hour == secondHour) { orders = sample.secondOrders; portions = sample.secondPortions; }
             else if (hour == Math.floorMod(firstHour - 1, 24)) { orders = 8; portions = 24; }
             else if (hour == Math.floorMod(secondHour + 1, 24)) { orders = 18; portions = 55; }
             return new HistoryRow(hour, orders, portions, capacity <= 0 ? 0 : round(portions / capacity * 100));
@@ -211,4 +323,6 @@ public class KitchenForecastService {
     private static double round(double value) { return Math.round(value * 10.0) / 10.0; }
     private record HistoryRow(int hour, double orders, double portions, double load) {}
     private record HourStat(LocalDateTime at, String weekday, double orders, double portions, double load) {}
+    private record SampleProfile(int capacity, long pending, long cooking, int currentLoad, int chefs,
+        String pendingByItem, double firstOrders, double firstPortions, double secondOrders, double secondPortions) {}
 }

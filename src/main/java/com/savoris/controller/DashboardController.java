@@ -3,6 +3,7 @@ package com.savoris.controller;
 import com.savoris.dto.response.BranchDashboardResponse;
 import com.savoris.dto.response.ChainDashboardResponse;
 import com.savoris.dto.response.KitchenForecastResponse;
+import com.savoris.dto.request.KitchenForecastSampleRequest;
 import com.savoris.security.CurrentUser;
 import com.savoris.security.Roles;
 import com.savoris.service.DashboardService;
@@ -15,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,5 +57,15 @@ public class DashboardController {
             @PathVariable Integer branchId, @CurrentUser Integer staffId,
             @RequestParam(defaultValue = "false") boolean sampleData) {
         return ResponseEntity.ok(kitchenForecastService.forecast(staffId, branchId, sampleData));
+    }
+
+    @PostMapping("/branch/{branchId}/kitchen-forecast/demo")
+    @PreAuthorize(Roles.MANAGEMENT)
+    @Operation(summary = "Dự báo từ file demo", description = "Nhận dữ liệu đã đọc từ workbook Excel; chỉ trả kết quả mô phỏng, không ghi dữ liệu vào database.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<KitchenForecastResponse> getKitchenForecastFromDemo(
+            @PathVariable Integer branchId, @CurrentUser Integer staffId,
+            @RequestBody KitchenForecastSampleRequest request) {
+        return ResponseEntity.ok(kitchenForecastService.forecastFromSample(staffId, branchId, request));
     }
 }
